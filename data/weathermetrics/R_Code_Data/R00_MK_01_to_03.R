@@ -76,7 +76,10 @@ return(1)}
 
 dt_stations <- fread(file="Station_Info.csv")
 
-vc_stations <- dt_stations[US_State %in% c("NJ"),STATION]
+#CT,RI,MA,NJ,PA,NY
+vc_stations <- dt_stations[US_State %in% c("NH","VT","ME"),STATION]
+
+wd <- "C:\\Users\\jhugh\\Documents\\HT\\NCEI_data"
 
 lst_complete <- lapply(vc_stations, function(in_xstation) 
                     fn_create_model_data(wd,in_xstation))
