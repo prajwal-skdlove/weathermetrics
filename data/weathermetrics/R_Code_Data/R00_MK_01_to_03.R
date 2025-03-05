@@ -1,9 +1,12 @@
 #Run data for a station
 library(data.table)
 
-source("C:/Users/jhugh/Documents/HT/NCEI_data/R01_Expand_Variables_from_Norm_Data.R")
-source("C:/Users/jhugh/Documents/HT/NCEI_data/R02_Create_Modeling_Data.R")
-source("C:/Users/jhugh/Documents/HT/NCEI_data/R03_Create_Modeling_Input_Dataset.R")
+#ip <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\data\\weathermetrics\\R_Code_Data"
+setwd("./data/weathermetrics/R_Code_Data/")
+source("R01_Expand_Variables_from_Norm_Data.R")
+source("R02_Create_Modeling_Data.R")
+source("R03_Create_Modeling_Input_Dataset.R")
+
 
 fn_create_model_data <- function(in_wd,in_xstation){
 # in_xstation <- vc_stations[48]
@@ -71,12 +74,9 @@ fwrite(fn_feat_AirTemp(dt00,"AT"),
 
 return(1)}
 
-wd <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data"
-setwd(wd)
 dt_stations <- fread(file="Station_Info.csv")
 
-#vc_stations <- dt_stations[US_State %in% c("NY","NJ","TX"),STATION]
-vc_stations <- dt_stations[US_State %in% c("CA"),STATION]
+vc_stations <- dt_stations[US_State %in% c("NJ"),STATION]
 
 lst_complete <- lapply(vc_stations, function(in_xstation) 
                     fn_create_model_data(wd,in_xstation))
