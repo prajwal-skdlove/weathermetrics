@@ -32,27 +32,15 @@ lst_file_details <- lapply(vc_files, function(x) fn_get_stationid_and_details(x)
 
 dt_file_details <- Reduce(rbind,lst_file_details)
 
-fwrite(dt_file_details,file="..\\Station_Info.csv")
+# fwrite(dt_file_details,file="..\\Station_Info.csv")
 
 #Starting 
+getwd()
 dt_file_details <- fread(file="..\\Station_Info.csv")
 
 #estimate of miles
 #To get latitude in radians multiply degrees by pi/180
 #distance = 69.17 miles * cos(latitude)
-
-#Identify nearbuy stations and check if they have metric files
-v_dist_degrees <- 1
-st_id <- "72502014734"
-lst_nearby_stations <- fn_get_nearby_stations(
-          dt_file_details,
-          st_id,
-          v_dist_degrees)
-
-in_metrics <- list("precip","relhum","airtemp")
-dt_nearby_stations <- fn_has_metrics(ipd02,lst_nearby_stations,in_metrics)
-
-
 
 fn_get_nearby_stations <- function(in_dt,in_stid,in_deg_distant){
   # in_dt the input data set from the list of all stations
@@ -148,5 +136,20 @@ fn_has_metrics <- function(in_path,in_stations,in_metrics){
 
   return(rtn_values)
 }
+
+
+#Identify nearbuy stations and check if they have metric files
+v_dist_degrees <- 1
+st_id <- "72502014734"
+lst_nearby_stations <- fn_get_nearby_stations(
+          dt_file_details,
+          st_id,
+          v_dist_degrees)
+
+in_metrics <- list("precip","relhum","airtemp")
+dt_nearby_stations <- fn_has_metrics(ipd02,lst_nearby_stations,in_metrics)
+
+
+
 
 
