@@ -115,15 +115,6 @@ fn_has_metrics <- function(in_path,in_stations,in_metrics){
   return(rtn_values)
 }
 
-if(TRUE == FALSE){
-in_ipd01 <- ipd01
-in_ipd02 <- ipd02
-in_ipfn <- "..\\Station_Info.csv"
-in_st_id <- "72502014734"
-in_v_dist_degrees <- 1
-in_metrics <- list("precip","relhum","airtemp")
-}
-
 fn_rank_stations <- function(in_dt_nearby_stations){
 
   dt_return <- dt_output
@@ -152,7 +143,7 @@ fn_list_stations_to_include <- function(in_ipd01,in_ipd02,
 
   dt_nearby_stations <- fn_has_metrics(in_ipd02,lst_nearby_stations,in_metrics)
 
-  dt_nearby_stations <- fn_rank_stations_to_include(dt_nearby_stations)
+  dt_nearby_stations <- fn_rank_stations(dt_nearby_stations)
 
   return(dt_nearby_stations)
 }
