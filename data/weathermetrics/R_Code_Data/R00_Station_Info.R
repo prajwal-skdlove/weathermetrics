@@ -1,13 +1,5 @@
-library(data.table)
-
-ipd01 <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data\\2024" 
-ipd02 <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data\\metrics_csv" 
-setwd(ipd01)
-
-vc_files <- list.files()
-
 fn_get_stationid_and_details <- function(in_stationid){
-  #in_stationid <- vc_files[1000]
+  
   dt_file <- fread(file=in_stationid)
   
   rtn_dt <- dt_file[1,c(
@@ -27,20 +19,6 @@ fn_get_stationid_and_details <- function(in_stationid){
                              "-")]
   return(rtn_dt)
 }
-
-lst_file_details <- lapply(vc_files, function(x) fn_get_stationid_and_details(x))
-
-dt_file_details <- Reduce(rbind,lst_file_details)
-
-# fwrite(dt_file_details,file="..\\Station_Info.csv")
-
-#Starting 
-getwd()
-dt_file_details <- fread(file="..\\Station_Info.csv")
-
-#estimate of miles
-#To get latitude in radians multiply degrees by pi/180
-#distance = 69.17 miles * cos(latitude)
 
 fn_get_nearby_stations <- function(in_dt,in_stid,in_deg_distant){
   # in_dt the input data set from the list of all stations
@@ -137,17 +115,61 @@ fn_has_metrics <- function(in_path,in_stations,in_metrics){
   return(rtn_values)
 }
 
-
-#Identify nearbuy stations and check if they have metric files
-v_dist_degrees <- 1
-st_id <- "72502014734"
-lst_nearby_stations <- fn_get_nearby_stations(
-          dt_file_details,
-          st_id,
-          v_dist_degrees)
-
+if(TRUE == FALSE){
+in_ipd01 <- ipd01
+in_ipd02 <- ipd02
+in_ipfn <- "..\\Station_Info.csv"
+in_st_id <- "72502014734"
+in_v_dist_degrees <- 1
 in_metrics <- list("precip","relhum","airtemp")
-dt_nearby_stations <- fn_has_metrics(ipd02,lst_nearby_stations,in_metrics)
+}
+
+
+fn_list_stations_to_include <- function(in_ipd01,in_ipd02,
+                                        in_ipfn,in_st_id,
+                                        in_v_dist_degrees,in_metrics){
+
+  setwd(in_ipd01)
+
+  #lst_file_details <- lapply(list.files() , function(x) fn_get_stationid_and_details(x))
+
+  dt_file_details <- fread(file= in_ipfn)
+  
+  lst_nearby_stations <- fn_get_nearby_stations(
+          dt_file_details,
+          in_st_id,
+          in_v_dist_degrees)
+
+  dt_nearby_stations <- fn_has_metrics(in_ipd02,lst_nearby_stations,in_metrics)
+
+  return(dt_nearby_stations)
+}
+
+
+#Identify nearby stations and check if they have metric files
+library(data.table)
+
+ipd01 <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data\\2024" 
+ipd02 <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data\\metrics_csv" 
+ipfn <- "..\\Station_Info.csv"
+in_st_id <- "72502014734"
+
+#estimate of miles
+#To get latitude in radians multiply degrees by pi/180
+#distance = 69.17 miles * cos(latitude)
+in_v_dist_degrees <- 1
+in_metrics <- list("precip","relhum","airtemp")
+
+dt_output <- fn_list_stations_to_include(ipd01,
+          ipd02,
+          ipfn,
+          in_st_id,
+          in_v_dist_degrees,
+          in_metrics)
+
+out_file <- paste(ipd01,"\\",in_st_id,"_station_analysis_set_",in_v_dist_degrees,".csv",sep="") 
+fwrite(dt_output,file=out_file)
+
 
 
 
