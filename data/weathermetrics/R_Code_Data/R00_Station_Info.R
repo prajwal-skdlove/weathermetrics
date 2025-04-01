@@ -124,14 +124,24 @@ in_v_dist_degrees <- 1
 in_metrics <- list("precip","relhum","airtemp")
 }
 
+fn_rank_stations <- function(in_dt_nearby_stations){
+
+  dt_return <- dt_output
+  dt_return[,vect_close_bkt := ifelse(is.na(vect_close_bkt),"0",vect_close_bkt)]
+  setorder(dt_return,"vect_close_bkt","fnames")
+
+  num_measures <- tabulate(as.numeric(dt_return$vect_close_bkt == 0))
+  num_sets <- length(dt_return$vect_close_bkt)/num_measures
+  dt_return$station_rank <- rep(1:19,3)[order(rep(1:num_sets,num_measures))]
+
+  return(dt_return)
+}
 
 fn_list_stations_to_include <- function(in_ipd01,in_ipd02,
                                         in_ipfn,in_st_id,
                                         in_v_dist_degrees,in_metrics){
 
   setwd(in_ipd01)
-
-  #lst_file_details <- lapply(list.files() , function(x) fn_get_stationid_and_details(x))
 
   dt_file_details <- fread(file= in_ipfn)
   
@@ -142,8 +152,11 @@ fn_list_stations_to_include <- function(in_ipd01,in_ipd02,
 
   dt_nearby_stations <- fn_has_metrics(in_ipd02,lst_nearby_stations,in_metrics)
 
+  dt_nearby_stations <- fn_rank_stations_to_include(dt_nearby_stations)
+
   return(dt_nearby_stations)
 }
+
 
 
 #Identify nearby stations and check if they have metric files
@@ -157,7 +170,7 @@ in_st_id <- "72502014734"
 #estimate of miles
 #To get latitude in radians multiply degrees by pi/180
 #distance = 69.17 miles * cos(latitude)
-in_v_dist_degrees <- 1
+in_v_dist_degrees <- 3
 in_metrics <- list("precip","relhum","airtemp")
 
 dt_output <- fn_list_stations_to_include(ipd01,
