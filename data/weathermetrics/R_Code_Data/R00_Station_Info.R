@@ -54,7 +54,11 @@ fn_get_nearby_stations <- function(in_dt,in_stid,in_deg_distant){
                 "vect_close_bkt",
                 "bearing_bkt"
   )
-  return(rtn_vals[!is.na(vect_close_bkt),..keep_var])
+
+#return(rtn_vals[,c("STATION","target_station","vect_close_bkt")])
+
+#return(rtn_vals[!is.na(vect_close_bkt),..keep_var])
+return(rtn_vals[,..keep_var])
 }
 
 fn_bearing <- function(lon1, lat1, lon2, lat2) {
@@ -77,53 +81,53 @@ fn_has_metrics <- function(in_path,in_stations,in_metrics){
   # in_stations the target station and the nearby stations
   # in_metrics is a list of the metrics that need to be available for all stations
   dt_stations <- data.table(fnames = list.files(path = in_path))
+
   dt_stations[, st_id := substr(fnames,1,11)]
 
   trgt_station <- in_stations$target_station[1]
-  dt_desired_stations <- data.table(st_id = 
-      c(trgt_station,in_stations$STATION))
 
-  dt_rtn <- merge(dt_stations,dt_desired_stations,
-                  by="st_id")
-  dt_rtn[,has_metric := 0]
+  dt_desired_stations <- merge(in_stations,dt_stations,
+                  by.x="STATION",
+                  by.y="st_id",
+                  all.x=TRUE)
+
+  dt_desired_stations <- dt_desired_stations[!is.na(fnames),]
+  dt_desired_stations[,has_metric := 0]
 
   lst_metrics <- lapply(in_metrics, function(x) {
-    index_metric <- grep(x,dt_rtn$fnames)
+    index_metric <- grep(x,dt_desired_stations$fnames)
     })
 
   for(i in 1:length(lst_metrics)){
-      dt_rtn[lst_metrics[[i]],has_metric := 1]
+      dt_desired_stations[lst_metrics[[i]],has_metric := 1]
   }
 
-  num_required_metrics <- length(lst_metrics)
+num_required_metrics <- length(lst_metrics)
 
-  dt_rtn[, cnt_metrics := sum(has_metric), by="st_id"]          
+dt_desired_stations[, cnt_metrics := sum(has_metric), by="STATION"]
 
-  dt_rtn <- data.table(dt_rtn[cnt_metrics == num_required_metrics &
+dt_rtn <- data.table(dt_desired_stations[cnt_metrics == num_required_metrics &
                       has_metric == 1,])
 
-  dt_rtn[,target_station := trgt_station]
-  dt_rtn[,path := in_path]  
+dt_rtn[,st_id := STATION]
+dt_rtn[,target_station := trgt_station]
+dt_rtn[,path := in_path]  
 
-  dt_rtn <- dt_rtn[,c("target_station","st_id","fnames","path")]
+rtn_values <- dt_rtn[,c("target_station","st_id","fnames",
+"path","vect_close_bkt","bearing_bkt")]
 
-  rtn_values <- merge(dt_rtn,in_stations[,c(2:4)],
-              by.x="st_id",
-              by.y="STATION",
-              all.x=TRUE)
-
-  return(rtn_values)
+return(rtn_values)
 }
 
 fn_rank_stations <- function(in_dt_nearby_stations){
 
-  dt_return <- dt_output
-  dt_return[,vect_close_bkt := ifelse(is.na(vect_close_bkt),"0",vect_close_bkt)]
-  setorder(dt_return,"vect_close_bkt","fnames")
+  dt_return <- in_dt_nearby_stations
+  dt_return[,vect_close_bkt2 := 1+as.numeric(ifelse(is.na(vect_close_bkt),"0",vect_close_bkt))]
+  setorder(dt_return,"vect_close_bkt2","fnames")
 
-  num_measures <- tabulate(as.numeric(dt_return$vect_close_bkt == 0))
-  num_sets <- length(dt_return$vect_close_bkt)/num_measures
-  dt_return$station_rank <- rep(1:19,3)[order(rep(1:num_sets,num_measures))]
+#  num_measures <- tabulate(as.numeric(dt_return$vect_close_bkt == 0))
+#  num_sets <- length(dt_return$vect_close_bkt)/num_measures
+#  dt_return$station_rank <- rep(1:19,3)[order(rep(1:num_sets,num_measures))]
 
   return(dt_return)
 }
@@ -141,11 +145,12 @@ fn_list_stations_to_include <- function(in_ipd01,in_ipd02,
           in_st_id,
           in_v_dist_degrees)
 
+
   dt_nearby_stations <- fn_has_metrics(in_ipd02,lst_nearby_stations,in_metrics)
 
-  dt_nearby_stations <- fn_rank_stations(dt_nearby_stations)
+  dt_ranked_nearby_stations <- fn_rank_stations(dt_nearby_stations)
 
-  return(dt_nearby_stations)
+  return(dt_ranked_nearby_stations)
 }
 
 
@@ -153,25 +158,42 @@ fn_list_stations_to_include <- function(in_ipd01,in_ipd02,
 #Identify nearby stations and check if they have metric files
 library(data.table)
 
-ipd01 <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data\\2024" 
-ipd02 <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data\\metrics_csv" 
+ipd01 <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data\\2024"
+ipd02 <- "\\\\CXA01\\Users\\jhugh\\Documents\\HT\\NCEI_data\\metrics_csv"
 ipfn <- "..\\Station_Info.csv"
-in_st_id <- "72502014734"
+#in_st_id <- "72502014734"
 
 #estimate of miles
 #To get latitude in radians multiply degrees by pi/180
 #distance = 69.17 miles * cos(latitude)
 in_v_dist_degrees <- 3
-in_metrics <- list("precip","relhum","airtemp")
+in_metrics <- list("precip", "relhum", "airtemp")
 
-dt_output <- fn_list_stations_to_include(ipd01,
+
+lst_target_stations <- c(
+  "74486094789",
+  "72518014735",
+  "72508014740",
+  "72526014860",
+  "72406093721",
+  "72401013740",
+  "72219013874",
+  "72423093821",
+  "72428014821",
+  "72327013897"
+)
+
+lst_output <- lapply(lst_target_stations, function(x) fn_list_stations_to_include(
+          ipd01,
           ipd02,
           ipfn,
-          in_st_id,
+          x,
           in_v_dist_degrees,
-          in_metrics)
+          in_metrics))
 
-out_file <- paste(ipd01,"\\",in_st_id,"_station_analysis_set_",in_v_dist_degrees,".csv",sep="") 
+dt_output <- Reduce(rbind,lst_output)
+
+out_file <- paste(ipd02,"\\","Target_station_analysis_set",".csv",sep="") 
 fwrite(dt_output,file=out_file)
 
 
