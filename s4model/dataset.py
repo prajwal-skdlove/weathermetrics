@@ -5,7 +5,8 @@ from torch.utils.data import Dataset, random_split, DataLoader
 import torchvision.transforms as transforms
 import torchvision
 import warnings
-
+import pyarrow.parquet as pq
+import pyarrow as pa
 #%%
 # Create the custom dataset class for CSV files
 # Access data clements using this class
@@ -104,7 +105,14 @@ def process_tabular_data(dataset_path, dependent_variable, independent_variables
     if dependent_variable is None:
         raise ValueError("Error: Please provide a dependent variable. Dependent variable cannot be None.")
     
-    df = pd.read_csv(dataset_path).fillna(0)
+    if dataset_path.endswith('.csv'):
+        df = pd.read_csv(dataset_path).fillna(0)
+    elif dataset_path.endswith('.parquet'):        
+        table = pq.read_table(dataset_path)
+        df = table.to_pandas().fillna(0)
+    else:
+        raise ValueError("Unsupported file format. Please provide a .csv or .parquet file.")
+    
     y_column = dependent_variable
     x_columns = independent_variables if independent_variables else [x for x in df.columns if x != y_column]
     
