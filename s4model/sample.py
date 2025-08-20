@@ -1,21 +1,31 @@
 import os
+import time
 import logging
+from datetime import datetime
 
 import torch
 import torch.backends.cudnn as cudnn
+import torch.nn as nn
 from tqdm import tqdm
+
+import argparse
+from dataset import load_data
+from output import combine_results_to_dataframe, save_results
+from model import S4Model, setup_optimizer
+from train import load_model
+from dataset import CSVDataset
 from torch.utils.data import DataLoader
 
 import pandas as pd
+import torch
+from torch.utils.data import Dataset, random_split, DataLoader
+import torchvision.transforms as transforms
+import torchvision
+import warnings
 import pyarrow.parquet as pq
+import pyarrow as pa
 import numpy as np
-import argparse
-
 from output import save_results
-from model import S4Model
-from train import load_model
-from dataset import CSVDataset
-
 
 
 def setup_logging(log_dir="logs", log_file="training.log"):
@@ -124,3 +134,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# python -m sample --modelname 72508014740 --modeltype classification --dataset ../data/weathermetrics/72508014740_validation.parquet  --tabulardata --dependent_variable 0 --epochs 1
+# python -m sample --modelname 72508014740 --modeltype regression --dataset ../data/weathermetrics/72614594705_sample.parquet  --tabulardata --dependent_variable air_temp_degrees_cels_max --epochs 1
+
+# python -m s4model --modelname 72508014740 --modeltype classification --dataset ../data/weathermetrics/72508014740_validation.parquet  --tabulardata --dependent_variable 0 --epochs 1
+# python -m s4model --modelname 72508014740 --modeltype regression --dataset ../data/weathermetrics/72614594705_sample.parquet  --tabulardata --dependent_variable air_temp_degrees_cels_max --epochs 1

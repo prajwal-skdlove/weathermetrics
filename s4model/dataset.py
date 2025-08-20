@@ -17,28 +17,42 @@ import pyarrow as pa
     # d_input is the input dimension (y, representing your y features).
 
 class CSVDataset(Dataset):
-    def __init__(self, dataset, x_columns, y_column, transform=None):
-        # Load the CSV file into a DataFrame
+    def __init__(self, dataset, x_columns, y_column=None, modeltype=None, transform=None, inference=False):
+        """
+        Args:
+            dataset (pd.DataFrame): DataFrame containing the data.
+            x_columns (list): List of feature column names.
+            y_column (str, optional): Name of the target column. Not required for inference.
+            modeltype (str, optional): 'classification' or 'regression'. Not required for inference.
+            transform (callable, optional): Optional transform to be applied on a sample.
+            inference (bool): If True, dataset is for inference and y is not expected.
+        """
         self.data = dataset
-        # Extract features and labels. convert to numpy array
         self.x = torch.tensor(self.data[x_columns].values, dtype=torch.float32)
-        self.y = torch.tensor(self.data[y_column].values, dtype=torch.long) # Use `dtype=torch.float32` for regression
-
-        # Optional: standardize features
-        # self.scaler = StandardScaler()
-        # self.x = self.scaler.fit_transform(self.x)
-
         self.transform = transform
+        self.inference = inference
+
+        if not inference and y_column is not None and modeltype is not None:
+            if modeltype == "classification":
+                self.y = torch.tensor(self.data[y_column].values, dtype=torch.long)
+            elif modeltype == "regression":
+                self.y = torch.tensor(self.data[y_column].values, dtype=torch.float32)
+            else:
+                raise ValueError("modeltype must be 'classification' or 'regression'")
+        else:
+            self.y = None
 
     def __len__(self):
         return len(self.x)
 
     def __getitem__(self, idx):
-         
-         if self.transform:
-            return self.transform(self.x[idx]).unsqueeze(0), self.y[idx]
-         
-         return self.x[idx].unsqueeze(0), self.y[idx]  # Add sequence length dimension
+        x_item = self.x[idx].unsqueeze(0)
+        if self.transform:
+            x_item = self.transform(x_item)
+        if self.inference or self.y is None:
+            return x_item
+        else:
+            return x_item, self.y[idx]
 
 #%%
 # Split a given dataset into training, validation and test sets
@@ -101,7 +115,7 @@ def process_image_dataset(dataset_name, grayscale):
 
 #%%
 # Function to process tabular datasets
-def process_tabular_data(dataset_path, dependent_variable, independent_variables):
+def process_tabular_data(dataset_path, dependent_variable, independent_variables, modeltype):
     if dependent_variable is None:
         raise ValueError("Error: Please provide a dependent variable. Dependent variable cannot be None.")
     
@@ -116,23 +130,27 @@ def process_tabular_data(dataset_path, dependent_variable, independent_variables
     y_column = dependent_variable
     x_columns = independent_variables if independent_variables else [x for x in df.columns if x != y_column]
     
-    csv_dataset = CSVDataset(df, x_columns, y_column)   
+    csv_dataset = CSVDataset(df, x_columns, y_column, modeltype)   
     
     d_input = len(x_columns)
-    d_output = df[y_column].nunique()
+    if modeltype == "classification":
+        d_output = df[y_column].nunique()
+    elif modeltype == "regression":
+        d_output = 1
     
     print(f"Input Features = {d_input}; Output Classes = {d_output}; Total Rows = {len(df)}")
     
-    return csv_dataset, d_input, d_output, df
+    return csv_dataset, d_input, d_output, df, x_columns
 
 #%%
 def load_data(args):
     if args.dataset:
         if args.dataset in ["cifar10", "mnist"]:
             trainset, valset, testset, d_input, d_output, df, train_df, test_df = process_image_dataset(args.dataset, args.grayscale)
+            x_columns = None  # No independent variables for image datasets
         elif args.tabulardata:
             trainset, valset, testset = None, None, None
-            csv_dataset, d_input, d_output, df = process_tabular_data(args.dataset, args.dependent_variable, args.independent_variables)
+            csv_dataset, d_input, d_output, df, x_columns = process_tabular_data(args.dataset, args.dependent_variable, args.independent_variables, args.modeltype)
             trainset, valset, testset = split_dataset(csv_dataset, splits = args.trainvaltestsplit)
             train_df, test_df = None, None
         else:
@@ -142,14 +160,14 @@ def load_data(args):
             raise NotImplementedError("Only tabular data is supported for train/val/test splits.")
         
         df = None
-        trainset, d_input, d_output, train_df = process_tabular_data(args.trainset, args.dependent_variable, args.independent_variables)
-        testset, _, _, test_df = process_tabular_data(args.testset, args.dependent_variable, args.independent_variables)
+        trainset, d_input, d_output, train_df, x_columns = process_tabular_data(args.trainset, args.dependent_variable, args.independent_variables,args.modeltype)
+        testset, _, _, test_df, _ = process_tabular_data(args.testset, args.dependent_variable, args.independent_variables, args.modeltype)
         
         if not args.valset:
             warnings.warn("Warning: Validation dataset is not provided. Splitting training dataset 80/20 for validation.")
             trainset, valset, train_df = split_dataset(trainset, train_split=0.8, val_split=0.2, test_split=0)
         else:
-            valset, _, _, val_df = process_tabular_data(args.valset, args.dependent_variable, args.independent_variables)        
+            valset, _, _, val_df, _ = process_tabular_data(args.valset, args.dependent_variable, args.independent_variables, args.modeltype)        
     else:
         if args.dataset == None and args.trainset == None and args.testset == None and args.valset == None:
             raise ValueError("Error: Please provide a dataset.")
@@ -161,4 +179,4 @@ def load_data(args):
     valloader = DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     testloader = DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     
-    return trainloader, valloader, testloader, d_input, d_output, trainset, valset, testset, df, train_df, test_df
+    return trainloader, valloader, testloader, d_input, d_output, trainset, valset, testset, df, train_df, test_df, x_columns

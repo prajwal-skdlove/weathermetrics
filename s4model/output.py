@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 from datetime import datetime 
+import logging
 
 #%%
 def combine_results_to_dataframe(dataloader, target_list, predicted_list, dependent_variable =None, valset=None, original_df=None, name = None):
@@ -71,15 +72,16 @@ def combine_results_to_dataframe(dataloader, target_list, predicted_list, depend
     return df_results
 
 #%%
-
 # Save the results of inference
-def save_results(input_data, predictions, target_list = None, dependent_variable = None, input_df=None, name = None):
-    """Saves inference results in a CSV file."""
+def save_results(input_data, predictions, target_list=None, dependent_variable=None, input_df=None, name=None):
+    """Saves inference results in a CSV file with error handling and logging."""
     results_dir = "../results/"
-    os.makedirs(results_dir, exist_ok=True)    
-    timestamp = datetime.now().strftime("%Y%m%d_%I%M%S%p")
-    filename = f"{results_dir}{name}_results_{timestamp}.csv"
-    
+    try:
+        os.makedirs(results_dir, exist_ok=True)
+    except Exception as e:
+        logging.error(f"Failed to create results directory '{results_dir}': {e}")
+        return None
+
     # df_results = pd.DataFrame(input_data)
 
     # # Determine column names while removing the dependent variable
@@ -88,17 +90,29 @@ def save_results(input_data, predictions, target_list = None, dependent_variable
     # else:  
     #     df_results.columns = [f'feature_{i}' for i in range(df_results.shape[1])]
 
-    # Add the target and predicted values
-    if dependent_variable is not None:
-        target = dependent_variable
-    else:
-        target = 'Target'
-    
-    df_results = pd.DataFrame({
-        target: target_list,
-        "Predicted": predictions
-    })
-    # df_results[target] = target_list
-    # df_results["Prediction"] = predictions
-    df_results.to_csv(filename, index=False)
-    print(f"Inference results saved to {filename}")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%I%M%S%p")
+    filename = f"{results_dir}{name}_results_{timestamp}.csv"
+
+    try:
+        if dependent_variable is not None:
+            target = dependent_variable
+        else:
+            target = 'Target'
+
+        df_results = pd.DataFrame({
+            target: target_list,
+            "Predicted": predictions
+        })
+
+        if target_list is None:
+            df_results.drop(columns=[target], inplace=True)
+            
+        df_results.to_csv(filename, index=False)
+        logging.info(f"Inference results saved to {filename}")
+        print(f"Inference results saved to {filename}")
+        return df_results
+    except Exception as e:
+        logging.error(f"Error saving inference results: {e}")
+        print(f"Error saving inference results: {e}")
+        return None

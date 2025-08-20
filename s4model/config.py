@@ -5,6 +5,7 @@ def get_args():
 
         # Dataset
         parser.add_argument('--modelname', type=str, required=True, help="Name for the model")
+        parser.add_argument('--modeltype', type=str, required=True, help='Model ["regression", "classification"]')
         parser.add_argument('--dataset', type=str, help='Dataset ["mnist", "cifar10", "customfullpath"]')
         parser.add_argument('--trainvaltestsplit', type=float, nargs=3, default=[0.7, 0.1, 0.2], help="Train, val, test split")
         parser.add_argument('--trainset', type=str, help="Training dataset path")
@@ -12,7 +13,7 @@ def get_args():
         parser.add_argument('--testset', type=str, help="Test dataset path")
         parser.add_argument('--tabulardata', action='store_true', help="Indicates dataset is tabular (CSV)")
         parser.add_argument('--dependent_variable', type=str, help="Dependent variable name")
-        parser.add_argument('--independent_variables', type=str, nargs='+', help="Independent variables")
+        parser.add_argument('--independent_variables', type=str, nargs='+', help="Independent variables")        
 
         # General
         parser.add_argument('--resume', action='store_true', help="Resume from checkpoint")
