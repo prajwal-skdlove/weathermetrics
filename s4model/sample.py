@@ -140,3 +140,8 @@ if __name__ == "__main__":
 
 # python -m s4model --modelname 72508014740 --modeltype classification --dataset ../data/weathermetrics/72508014740_validation.parquet  --tabulardata --dependent_variable 0 --epochs 1
 # python -m s4model --modelname 72508014740 --modeltype regression --dataset ../data/weathermetrics/72614594705_sample.parquet  --tabulardata --dependent_variable air_temp_degrees_cels_max --epochs 1
+
+# python -m s4model --modelname fake --modeltype classification --dataset ../data/weathermetrics/fake_train.parquet  --tabulardata --dependent_variable target --epochs 1
+
+# python -m s4model --modelname fake --modeltype classification --dataset ../data/weathermetrics/fake_train.parquet  --tabulardata --dependent_variable target --epochs 1
+python -m s4model --modelname fake --modeltype classification --trainset ../data/weathermetrics/fake_train.parquet --valset ../data/weathermetrics/fake_validation.parquet --testset ../data/weathermetrics/fake_test.parquet --tabulardata --dependent_variable target --epochs 1
