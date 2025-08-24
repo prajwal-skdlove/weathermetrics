@@ -175,3 +175,4 @@ cython_debug/
 data/
 results/
 s4model/logs/
+checkpoint/
