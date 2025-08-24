@@ -2,175 +2,283 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 import os
+import logging
+import numpy as np
+from model import log_gradients
+
 
 ###############################################################################
-# Everything after this point is standard PyTorch training!
+# Standard PyTorch training and evaluation utilities with error handling
 ###############################################################################
 
-# Training
 def train(model, trainloader, criterion, optimizer, device, modeltype="classification"):
     """
-    modeltype: "classification" or "regression"
+    Train the model for one epoch with logging and error handling.
+
+    Args:
+        model: PyTorch model to be trained.
+        trainloader: DataLoader providing training batches.
+        criterion: Loss function.
+        optimizer: Optimizer instance.
+        device: Target device ("cpu" or "cuda").
+        modeltype: "classification" or "regression".
+
+    Returns:
+        (avg_loss, accuracy) for classification
+        (avg_loss,) for regression
     """
+
+    if modeltype not in ["classification", "regression"]:
+        logging.error(f"Invalid modeltype: {modeltype}")
+        raise ValueError(f"Invalid modeltype '{modeltype}'. Use 'classification' or 'regression'.")
+
     model.train()
-    train_loss = 0
-    correct = 0
-    total = 0
-    pbar = tqdm(enumerate(trainloader))
+    train_loss, correct, total = 0, 0, 0
+
+    pbar = tqdm(enumerate(trainloader), total=len(trainloader), desc="Training")
     for batch_idx, (inputs, targets) in pbar:
-        # print(f"Batch input shape: {inputs.shape}, Batch target shape: {targets.shape}")
-        inputs, targets = inputs.to(device), targets.to(device)
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        if modeltype == "regression":
-                if targets.dim() == 1 and outputs.dim() == 2 and outputs.size(1) == 1:
-                    targets = targets.view(-1, 1)
-        loss = criterion(outputs, targets)
-        loss.backward()
-        optimizer.step()
-
-        train_loss += loss.item()
-        total += targets.size(0)
-
-        if modeltype == "classification":
-            _, predicted = outputs.max(1)
-            correct += predicted.eq(targets).sum().item()
-            acc = 100. * correct / total
-            desc = (
-                'Batch Idx: (%d/%d) | Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-                (batch_idx, len(trainloader), train_loss/(batch_idx+1), acc, correct, total)
-            )
-        elif modeltype == "regression":  # regression
-            mse = loss.item()
-            desc = (
-                'Batch Idx: (%d/%d) | Loss: %.3f (MSE)' %
-                (batch_idx, len(trainloader), mse)
-            )
-        pbar.set_description(desc)
-
-
-def eval(model, dataloader, criterion, device, epoch, modelname, best_acc, args, modeltype="classification", checkpoint=False):
-    """
-    Evaluates the model.
-    modeltype: "classification" or "regression"
-    """
-    output_list_target = []
-    output_list_predicted = []
-    model.eval()
-    eval_loss = 0
-    correct = 0
-    total = 0
-
-    with torch.no_grad():
-        pbar = tqdm(enumerate(dataloader))
-        for batch_idx, (inputs, targets) in pbar:
+        try:
+            # Move inputs/targets to device
             inputs, targets = inputs.to(device), targets.to(device)
+            optimizer.zero_grad()
+
+            # Forward pass
             outputs = model(inputs)
+
+            # Handle regression reshaping
             if modeltype == "regression":
                 if targets.dim() == 1 and outputs.dim() == 2 and outputs.size(1) == 1:
                     targets = targets.view(-1, 1)
-            loss = criterion(outputs, targets)
 
-            eval_loss += loss.item()
+            # Compute loss
+            loss = criterion(outputs, targets)
+            loss.backward()
+
+            # Log gradient stats
+            log_gradients(model)
+
+            optimizer.step()
+
+            # Track loss
+            train_loss += loss.item()
             total += targets.size(0)
 
             if modeltype == "classification":
                 _, predicted = outputs.max(1)
                 correct += predicted.eq(targets).sum().item()
-                output_list_target.extend(targets.cpu().numpy())
-                output_list_predicted.extend(predicted.cpu().numpy())
-                acc = 100. * correct / total
-                desc = (
-                    'Batch Idx: (%d/%d) | Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-                    (batch_idx, len(dataloader), eval_loss/(batch_idx+1), acc, correct, total)
-                )
-            elif modeltype == "regression":  # regression
-                output_list_target.extend(targets.cpu().numpy())
-                output_list_predicted.extend(outputs.squeeze().cpu().numpy())
-                mse = loss.item()
-                desc = (
-                    'Batch Idx: (%d/%d) | Loss: %.3f (MSE)' %
-                    (batch_idx, len(dataloader), mse)
-                )
+                acc = 100. * correct / total if total > 0 else 0.0
+                desc = (f"Batch {batch_idx}/{len(trainloader)} | "
+                        f"Loss: {train_loss/(batch_idx+1):.3f} | Acc: {acc:.2f}% ({correct}/{total})")
+            else:  # regression
+                desc = (f"Batch {batch_idx}/{len(trainloader)} | "
+                        f"Loss: {loss.item():.3f} (MSE)")
+
             pbar.set_description(desc)
 
-    # Save checkpoint.
-    if checkpoint and modeltype == "classification":
-        acc = 100.*correct/total
-        if acc > best_acc:
-            state = {
-                'model': model.state_dict(),
-                'acc': acc,
-                'epoch': epoch,
-                "args": vars(args)
-            }
+        except Exception as e:
+            logging.exception(f"Error in training loop at batch {batch_idx}: {e}")
+            continue  # Skip problematic batch instead of crashing
+
+    # ---- Final logging ----
+    avg_loss = train_loss / (batch_idx + 1 if batch_idx >= 0 else 1)
+
+    if modeltype == "classification":
+        acc = 100. * correct / total if total > 0 else 0.0
+        logging.info(f"Training complete — Avg Loss: {avg_loss:.4f}, Accuracy: {acc:.2f}%")
+        return avg_loss, acc
+    else:
+        logging.info(f"Training complete — Avg Loss (MSE): {avg_loss:.4f}")
+        return avg_loss,
+
+
+def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
+         args, modeltype="classification", checkpoint=False):
+    """
+    Evaluate the model safely with logging and error handling.
+
+    Args:
+        model: PyTorch model.
+        dataloader: DataLoader for evaluation data.
+        criterion: Loss function.
+        device: "cpu" or "cuda".
+        epoch: Current epoch.
+        modelname: Name prefix for checkpoints.
+        best_acc: Best accuracy seen so far (classification only).
+        args: Namespace or dict of model args (saved for checkpoints).
+        modeltype: "classification" or "regression".
+        checkpoint: Save checkpoint if True.
+
+    Returns:
+        (metric, targets, predictions)
+    """
+    if modeltype not in ["classification", "regression"]:
+        logging.error(f"Invalid modeltype: {modeltype}")
+        raise ValueError(f"Invalid modeltype '{modeltype}'. Use 'classification' or 'regression'.")
+
+    output_list_target, output_list_predicted = [], []
+    model.eval()
+    eval_loss, correct, total = 0, 0, 0
+
+    with torch.no_grad():
+        pbar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Evaluating")
+        for batch_idx, (inputs, targets) in pbar:
+            try:
+                inputs, targets = inputs.to(device), targets.to(device)
+                outputs = model(inputs)
+
+                # Handle regression reshaping
+                if modeltype == "regression":
+                    if targets.dim() == 1 and outputs.dim() == 2 and outputs.size(1) == 1:
+                        targets = targets.view(-1, 1)
+
+                # Compute loss
+                loss = criterion(outputs, targets)
+                eval_loss += loss.item()
+                total += targets.size(0)
+
+                if modeltype == "classification":
+                    _, predicted = outputs.max(1)
+                    correct += predicted.eq(targets).sum().item()
+
+                    # Ensure extend always gets a list/array
+                    output_list_target.extend(np.atleast_1d(targets.cpu().numpy()))
+                    output_list_predicted.extend(np.atleast_1d(predicted.cpu().numpy()))
+
+                    acc = 100. * correct / total
+                    desc = (f"Batch {batch_idx}/{len(dataloader)} | "
+                            f"Loss: {eval_loss/(batch_idx+1):.3f} | Acc: {acc:.2f}% ({correct}/{total})")
+
+                else:  # regression
+                    output_list_target.extend(np.atleast_1d(targets.cpu().numpy()))
+                    output_list_predicted.extend(np.atleast_1d(outputs.squeeze().cpu().numpy()))
+
+                    desc = (f"Batch {batch_idx}/{len(dataloader)} | "
+                            f"Loss: {loss.item():.3f} (MSE)")
+
+                pbar.set_description(desc)
+
+            except Exception as e:
+                logging.exception(f"Error in evaluation loop at batch {batch_idx}: {e}")
+                continue  # Skip bad batch instead of crashing
+
+    # ---- Checkpoint saving ----
+    try:
+        if checkpoint:
             if not os.path.isdir('../checkpoint'):
                 os.mkdir('../checkpoint')
-            torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
-            best_acc = acc
+
+            if modeltype == "classification":
+                acc = 100. * correct / total if total > 0 else 0.0
+                if acc > best_acc:
+                    state = {
+                        "model": model.state_dict(),
+                        "acc": acc,
+                        "epoch": epoch,
+                        "args": vars(args) if not isinstance(args, dict) else args
+                    }
+                    torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
+                    logging.info(f"Checkpoint saved: {modelname}ckpt.pth (Acc: {acc:.2f}%)")
+                    best_acc = acc
+                return acc, output_list_target, output_list_predicted
+
+            else:  # regression
+                mse = eval_loss / (batch_idx + 1)
+                state = {
+                    "model": model.state_dict(),
+                    "mse": mse,
+                    "epoch": epoch,
+                    "args": vars(args) if not isinstance(args, dict) else args
+                }
+                torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
+                logging.info(f"Checkpoint saved: {modelname}ckpt.pth (MSE: {mse:.4f})")
+                return mse, output_list_target, output_list_predicted
+
+    except Exception as e:
+        logging.exception(f"Error while saving checkpoint: {e}")
+
+    # ---- Final metric return ----
+    if modeltype == "classification":
+        acc = 100. * correct / total if total > 0 else 0.0
+        logging.info(f"Evaluation complete — Accuracy: {acc:.2f}%")
         return acc, output_list_target, output_list_predicted
-    elif checkpoint and modeltype == "regression":
+    else:
         mse = eval_loss / (batch_idx + 1)
-        state = {
-            'model': model.state_dict(),
-            'mse': mse,
-            'epoch': epoch,
-            "args": vars(args)
-        }
-        if not os.path.isdir('../checkpoint'):
-            os.mkdir('../checkpoint')
-        torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
+        logging.info(f"Evaluation complete — MSE: {mse:.4f}")
         return mse, output_list_target, output_list_predicted
-    else:
-        if modeltype == "classification":
-            acc = 100.*correct/total
-            return acc, output_list_target, output_list_predicted
-        elif modeltype == "regression":
-            mse = eval_loss / (batch_idx + 1)
-            return mse, output_list_target, output_list_predicted
 
-#%%
-#Loads the model for inference
 def load_model(model_class, modelname, device="cpu"):
-    """Loads the model and its arguments from a checkpoint."""
-    checkpoint_path = f"../checkpoint/{modelname}ckpt.pth"
-    
-    assert os.path.isdir('../checkpoint/'), 'Error: no checkpoint directory found!'
+    """
+    Load model and arguments from a checkpoint with logging and error handling.
 
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    
-    # Restore model arguments
-    model_args = checkpoint["args"]
-    
-    # Initialize model with saved args
-    model = model_class(
-        d_input=model_args["d_input"],
-        d_output=model_args["d_output"],
-        lr =model_args["lr"],
-        d_model=model_args["d_model"],
-        n_layers=model_args["n_layers"],
-        dropout=model_args["dropout"],
-        prenorm=model_args["prenorm"],
-    )
-    
-    model.load_state_dict(checkpoint["model"])
-    model.eval()
-    
-    # Infer metric type and print
-    if "acc" in checkpoint:
-        best_metric = checkpoint["acc"]
-        metric_name = "Accuracy"
-    elif "mse" in checkpoint:
-        best_metric = checkpoint["mse"]
-        metric_name = "MSE"
-    else:
-        best_metric = None
-        metric_name = "Unknown metric"
+    Args:
+        model_class: The class of the model to initialize.
+        modelname: Checkpoint file prefix (string).
+        device: Device to load model on ("cpu" or "cuda").
 
-    start_epoch = checkpoint.get('epoch', None)
+    Returns:
+        model, model_args, best_metric, start_epoch
+    """
+    checkpoint_dir = "../checkpoint"
+    checkpoint_path = os.path.join(checkpoint_dir, f"{modelname}ckpt.pth")
 
-    print(f"Model and arguments loaded from {checkpoint_path}")
-    print(f"{metric_name}: {best_metric}")
-    return model, model_args, best_metric, start_epoch
+    # Check directory
+    if not os.path.isdir(checkpoint_dir):
+        logging.error(f"Checkpoint directory not found: {checkpoint_dir}")
+        raise FileNotFoundError(f"No checkpoint directory at {checkpoint_dir}")
 
+    # Check file
+    if not os.path.exists(checkpoint_path):
+        logging.error(f"Checkpoint file not found: {checkpoint_path}")
+        raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
 
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+    except Exception as e:
+        logging.exception(f"Failed to load checkpoint from {checkpoint_path}: {e}")
+        raise
+
+    try:
+        # Restore model args
+        model_args = checkpoint.get("args", {})
+        if not model_args:
+            logging.warning("No 'args' found in checkpoint — using defaults.")
+            model_args = {}
+
+        # Initialize model with args (keys missing -> None)
+        model = model_class(
+            d_input=model_args.get("d_input"),
+            d_output=model_args.get("d_output"),
+            lr=model_args.get("lr"),
+            d_model=model_args.get("d_model"),
+            n_layers=model_args.get("n_layers"),
+            dropout=model_args.get("dropout"),
+            prenorm=model_args.get("prenorm"),
+        )
+
+        # Load weights
+        model.load_state_dict(checkpoint["model"])
+        model.to(device)
+        model.eval()
+
+        # Detect metric type
+        if "acc" in checkpoint:
+            best_metric, metric_name = checkpoint["acc"], "Accuracy"
+        elif "mse" in checkpoint:
+            best_metric, metric_name = checkpoint["mse"], "MSE"
+        else:
+            best_metric, metric_name = None, "Unknown"
+
+        start_epoch = checkpoint.get("epoch", None)
+
+        logging.info(f"Model successfully loaded from {checkpoint_path}")
+        logging.info(f"{metric_name}: {best_metric if best_metric is not None else 'N/A'}")
+        if start_epoch is not None:
+            logging.info(f"Resuming from epoch {start_epoch}")
+
+        return model, model_args, best_metric, start_epoch
+
+    except KeyError as e:
+        logging.exception(f"Missing key in checkpoint: {e}")
+        raise
+        raise
+###############################################################################

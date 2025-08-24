@@ -9,7 +9,7 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from config import get_args
-from dataset import load_data
+from dataset import load_data, verify_loaders
 from output import combine_results_to_dataframe
 from model import S4Model, setup_optimizer
 from train import train, eval, load_model
@@ -48,6 +48,7 @@ def main():
     # Load dataset
     logging.info("Preparing data...")
     trainloader, valloader, testloader, d_input, d_output, trainset, valset, testset, df, train_df, test_df, args.independent_variables = load_data(args)
+    verify_loaders(trainloader, valloader, testloader, modeltype=args.modeltype)
     args.d_input = d_input
     args.d_output = d_output
 
