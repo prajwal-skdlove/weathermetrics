@@ -6,24 +6,20 @@ library(caret)
 
 
 #Get list of current s$ files
-wd01 <- "~/Py_S4/Py_S4_v02_JHH/NCEI_parquet_files/"
+wd01 <- "~/Py_S4/NCEI_parquet_files/"
 fpattern <- "*train.csv"
 lst_data_filename <- list.files(wd01,pattern=fpattern,full.names =FALSE)
 
 lst_data_files <- list.files(wd01,pattern=fpattern,full.names =TRUE)
-lst_file_size <- lapply(lst_data_files, function(xf){
+lst_file_size <- as.vector(Reduce(rbind,as.numeric(lapply(lst_data_files, function(xf){
   mbs <- file.size(xf)/(1024*1024)
   mbs
-})
+}))))
 
-
-
-# stid <- "74486094789"  #JFK
-# stid <- "72278023183"  #Phoenix
-# stid <- "72202012839"  #Miami
-# stid <- "72243012960"  #Houston
-# stid <- "72502014734"  #Newark
-
+dt_infiles <- data.table('Fname'=lst_data_filename,
+                         'Fpath'=lst_data_files,
+                         'Fsize'=lst_file_size)
+dt_infiles[,stid := substr(Fname,1,11)]
 
 
 fn_mnl <- function(fnp){
