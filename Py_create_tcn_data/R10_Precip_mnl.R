@@ -20,7 +20,9 @@ dt_infiles <- data.table('Fname'=lst_data_filename,
                          'Fpath'=lst_data_files,
                          'Fsize'=lst_file_size)
 dt_infiles[,stid := substr(Fname,1,11)]
-
+dt_infiles_sub <- dt_infiles[Fsize >= 100,]
+lst_mod_files <- dt_infiles_sub$Fpath
+lst_mod_stid <- substr(dt_infiles_sub$Fname,1,11)
 
 fn_mnl <- function(fnp){
   #fnp <- lst_data_files[10]
@@ -128,7 +130,7 @@ fn_mnl <- function(fnp){
 }
 
 #Get model output for all stations
-lst_mnl_results <- lapply(lst_data_files, function(xfn) fn_mnl(xfn))
+lst_mnl_results <- lapply(lst_mod_files, function(xfn) fn_mnl(xfn))
 
 fn_confmat <- function(dtres,act_thresh,pred_thresh){
   
@@ -148,9 +150,10 @@ fn_confmat <- function(dtres,act_thresh,pred_thresh){
 }
 
 fn_confmat_grid <- function(fname,dtres,vc_act,vc_pred){
-  
-  # iact <- vc_act[1]
-  # iprd <- vc_pred[1]
+  # fname <- lst_mod_files[1]
+  # dtres <- lst_mnl_results[[1]]
+  # vc_act <- vc_act
+  # vc_pred <- vc_prb
   
   lst_rtn <- lapply(vc_act, function(xact) {
     Reduce(rbind,lapply(vc_pred, function(xprd) {
@@ -172,13 +175,15 @@ fn_confmat_grid <- function(fname,dtres,vc_act,vc_pred){
   return(dt_rtn)
 }
 
+vc_act <- c(.5,1,4)
+vc_prb <- c(.1,.15,.18,.2,.22,.25,.3)
 
-vc_act <- c(.1,.5,1,4)
-vc_prb <- c(.1,.15,.2,.25,.3)
-
-lst_grids <- lapply(1:length(lst_data_filename), function(xidx) {
-  fn_confmat_grid(lst_data_filename[xidx],lst_mnl_results[[xidx]],vc_act,vc_prb)
+ilim <- length(lst_mod_files)
+lst_grids <- lapply(1:ilim, function(xidx) {
+  print(xidx)
+  fn_confmat_grid(lst_mod_files[xidx],lst_mnl_results[[xidx]],vc_act,vc_prb)
 })
+
 
 dt_grid <- Reduce(rbind,lst_grids)
 dt_grid[,fct_Prob_Threshold := factor(Prob_Threshold)]
@@ -198,3 +203,58 @@ zz
 
 stids <- unique(dt_grid$Source)
 stids
+
+
+#Create bat file to run s4 models on same data files
+lst_cmds <- unlist(lapply(3:length(stids), function(idx){
+  #idx <- 1
+  lst_mod_stid[idx]
+  cmd_data_file <- stids[idx]
+  iepochs <- 100
+  bat_content <- paste("python -m s4model --modelname",
+                     paste("s4",lst_mod_stid[idx],sep="_"),
+                     "--modeltype classification --dataset ",
+                     paste(substr(stids[idx],1,nchar(stids[idx])-4),".parquet",sep=""),
+                     " --tabulardata --dependent_variable tgt_bin --epochs ",
+                     iepochs,
+                     sep=" ")
+  bat_content
+  }))
+file_conn <- file("C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\s4model\\py_s4b.bat",open="w")
+writeLines(lst_cmds,con=file_conn)
+close(file_conn)
+
+
+#Get list of current s4 output files
+
+wd01 <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\results"
+fpattern <- "*Test_results*"
+lst_data_filename <- list.files(wd01,pattern=fpattern,full.names =FALSE)
+lst_data_fullname <- list.files(wd01,pattern=fpattern,full.names =TRUE)
+
+ix <- 20
+
+lst_s4_cm <- lapply(1:length(lst_data_filename),function(ix){
+  dt_res <- fread(file=lst_data_fullname[ix])
+  prd <- as.factor(dt_res$Predicted)
+  act <- as.factor(dt_res$tgt_bin)
+  
+  cm <- confusionMatrix(data = prd, 
+                        reference = act,
+                        mode="everything")
+  
+  cm[[6]] <- lst_data_filename[ix]
+  cm[[7]] <- substr(cm[[6]],4,14)
+  
+  # rtn_summ <- cm[[4]][,c("Precision","Recall","Balanced Accuracy")]
+  # rnames <-  unlist(attr(lst_s4_cm[[29]],"dimnames")[[1]])
+  # st_id <- as.character(cm[[7]])
+  
+  rtn_sub <- cm[[4]][,c("Precision","Recall","Balanced Accuracy")]
+  rtn_class <- unlist(attr(rtn_sub,"dimnames")[[1]])
+  
+  rtn_val <- data.table(rtn_sub,Class = rtn_class, St_id = as.character(cm[[7]]))
+  rtn_val 
+})
+
+
