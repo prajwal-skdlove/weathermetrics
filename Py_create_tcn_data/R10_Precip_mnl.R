@@ -226,7 +226,6 @@ close(file_conn)
 
 
 #Get list of current s4 output files
-
 wd01 <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\results"
 fpattern <- "*Test_results*"
 lst_data_filename <- list.files(wd01,pattern=fpattern,full.names =FALSE)
@@ -256,5 +255,5 @@ lst_s4_cm <- lapply(1:length(lst_data_filename),function(ix){
   rtn_val <- data.table(rtn_sub,Class = rtn_class, St_id = as.character(cm[[7]]))
   rtn_val 
 })
-
+dt <- data.table(Reduce(rbind,lst_s4_cm))
 
