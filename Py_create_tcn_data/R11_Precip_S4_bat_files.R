@@ -1,4 +1,4 @@
-
+install.packages("arrow")
 library(data.table)
 library(arrow)
 library(woeBinning)
@@ -29,85 +29,10 @@ fn_get_file_info <- function(){
 
 #Get data table of data file info
 dt_files <- fn_get_file_info()
-stids <- dt_files$stid
 
-#Create bat file to run s4 models on same data files
-if(TRUE==FALSE){
-lst_cmds <- unlist(lapply(1:length(stids), function(idx){
-  cmd_data_file <- stids[idx]
-  iepochs <- 100
-  dataset_fpn <- paste("C:\\Users\\jhugh\\Documents\\Py_S4\\NCEI_parquet_files\\",
-                       substr(stids[idx],1,nchar(stids[idx])),"_DAYSUM_train.parquet",sep="")
-  bat_content <- paste("python -m s4model --modelname",
-                       paste("s4_DAYSUM",stids[idx],sep="_"),
-                       "--modeltype classification --dataset ",
-                       dataset_fpn,
-                       " --tabulardata --dependent_variable tgt_bin --epochs ",
-                       iepochs,
-                       sep=" ")
-  bat_content
-}))
-
-# Specify the path and filename for the batch file
-fpn <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\s4model\\pyS4_DAYSUM.bat"
-bat_file_path <- fpn
-
-# Write the content to the batch file
-writeLines(lst_cmds[2:29], con = bat_file_path)
-}
-
-
-
-# Check conf matrix for models
-fn_conmat_s4 <- function(ipf){
-  infile <- ipf$Fpath
-  stdid <- ipf$stid
-  attr(stdid,"names") <- "Station ID"
-  dt01 <- fread(infile)
-  
-  tbl <- table(dt01$tgt_bin,dt01$Predicted)
-  names(dimnames(tbl)) <- list("Actual (row)","Predicted (col)")
-  
-  dt01[,tgt_has_rain := factor(ifelse(tgt_bin == 0,FALSE,TRUE))]
-  dt01[,prd_has_rain := factor(ifelse(Predicted == 0,FALSE,TRUE))]
-  #print(table(dt01$tgt_has_rain,dt01$prd_has_rain))
-  cm <- confusionMatrix(data = dt01$tgt_has_rain, 
-                         reference = dt01$prd_has_rain, 
-                         positive = "TRUE")
-  Precision <- cm$byClass[match("Precision",attr(cm$byClass,"names"))]
-  Recall <- cm$byClass[match("Sensitivity",attr(cm$byClass,"names"))]
-  attr(Recall,"names") <- "Recall"
-  
-  lst_rtn <- list(stdid,tbl,cm,list(Precision,Recall))
-  return(lst_rtn)
-  
-}
-
-# Get list of files
-fn_get_file_info_s4 <- function(){
-  wd01 <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\results"
-  fpattern <- "^s4_DAYSUM*"
-  lst_data_filename <- list.files(wd01,pattern=fpattern,full.names =FALSE)
-  test_results <- grep("Test_results",lst_data_filename)
-  lst_data_filename <- lst_data_filename[test_results]
-  lst_data_files <- list.files(wd01,pattern=fpattern,full.names =TRUE)[test_results]
-  lst_file_size <- as.vector(Reduce(rbind,as.numeric(lapply(lst_data_files, function(xf){
-    mbs <- file.size(xf)/(1024*1024)
-    mbs
-  }))))
-  
-  dt_infiles <- data.table('Fname'=lst_data_filename,
-                           'Fpath'=lst_data_files,
-                           'Fsize'=lst_file_size)
-  dt_infiles[,stid := substr(Fname,11,21)]
-  return(dt_infiles)
-}
-
-dt_files <- fn_get_file_info_s4()
-lst_results <- lapply(1:dim(dt_files)[1], function(xf){
-    res <- fn_conmat_s4(dt_files[xf])
-    res})
-length(lst_results)
+output_file <- "my_data.parquet"
+write_parquet(dt_files, sink = output_file)
+jj <- read_parquet(dt_files, output_file)
 
 
 
@@ -562,6 +487,24 @@ stids <- unique(dt_grid$Source)
 stids
 
 
+#Create bat file to run s4 models on same data files
+lst_cmds <- unlist(lapply(3:length(stids), function(idx){
+  #idx <- 1
+  lst_mod_stid[idx]
+  cmd_data_file <- stids[idx]
+  iepochs <- 100
+  bat_content <- paste("python -m s4model --modelname",
+                     paste("s4",lst_mod_stid[idx],sep="_"),
+                     "--modeltype classification --dataset ",
+                     paste(substr(stids[idx],1,nchar(stids[idx])-4),".parquet",sep=""),
+                     " --tabulardata --dependent_variable tgt_bin --epochs ",
+                     iepochs,
+                     sep=" ")
+  bat_content
+  }))
+file_conn <- file("C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\s4model\\py_s4b.bat",open="w")
+writeLines(lst_cmds,con=file_conn)
+close(file_conn)
 
 
 #Get list of current s4 output files
