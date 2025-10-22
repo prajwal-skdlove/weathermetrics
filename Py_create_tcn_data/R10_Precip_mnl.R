@@ -109,8 +109,34 @@ lst_results <- lapply(1:dim(dt_files)[1], function(xf){
     res})
 length(lst_results)
 
+fn_summarize_confmat <- function(ix){
+    #ix <- lst_results[[2]]
+    dt3 <- data.table(cbind(attr(ix[[3]][3]$overall,"names"),as.numeric(ix[[3]][[3]])))
+    colnames(dt3) <- c("Metric","Value")
+    dt4 <- data.table(cbind(attr(ix[[3]][4]$byClass,"names"),as.numeric(ix[[3]][[4]])))
+    colnames(dt4) <- c("Metric","Value")
+    
+    dt1 <- data.table(ix[[2]])
+    dt1$key <- 1:dim(dt1)[1]
+    
+    dt2 <- data.table(ix[[3]][[2]])
+    dt2$key <- 1:dim(dt2)[1]
+    
+    dt_metrics <- rbind(dt4,dt3)
+    
+    dt_metrics$key <- 1:dim(dt_metrics)[1]
+    lst_dt <- list(dt1,dt2,dt_metrics)
+    
+    dt_res <- Reduce(function(x,y) merge(x,y,by="key",all.x=TRUE), lst_dt)
+    dt_res$Station_ID <- ix[[1]]
+    dt_res
+}
+lst_cm <- lapply(lst_results, function(xi) fn_summarize_confmat(xi))
 
 
+
+##################################
+#Ignore below
 #Run mnl for one station
 fn_pqt_one_model <- function(fpn,woe_cutoff){
   
