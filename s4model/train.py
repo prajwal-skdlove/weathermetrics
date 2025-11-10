@@ -109,13 +109,22 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
         checkpoint: Save checkpoint if True.
 
     Returns:
-        (metric, targets, predictions)
+    Returns:
+        (metric, targets, predictions, prob_list)
+        For classification:
+            - metric: accuracy 
+            - prob_list: list of dicts per-sample mapping class index (as str) -> probability
+
+        For regression:            
+            - metric: mean squared error
+            - prob_list: empty list           
+        
     """
     if modeltype not in ["classification", "regression"]:
         logging.error(f"Invalid modeltype: {modeltype}")
         raise ValueError(f"Invalid modeltype '{modeltype}'. Use 'classification' or 'regression'.")
 
-    output_list_target, output_list_predicted = [], []
+    output_list_target, output_list_predicted, prob_list = [], [], []
     model.eval()
     eval_loss, correct, total = 0, 0, 0
 
@@ -137,14 +146,30 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
                 total += targets.size(0)
 
                 if modeltype == "classification":
-                    _, predicted = outputs.max(1)
+                    # Compute probabilities
+                    if outputs.dim() == 1 or (outputs.dim() == 2 and outputs.size(1) == 1):
+                        # Binary logits or single-output: use sigmoid -> produce two-class probs
+                        probs_pos = torch.sigmoid(outputs.squeeze())
+                        # Ensure shape (N,2)
+                        probs_batch = torch.stack([1.0 - probs_pos, probs_pos], dim=1)
+                    else:
+                        probs_batch = torch.softmax(outputs, dim=1)
+
+                    # Predicted class from probabilities
+                    predicted = probs_batch.argmax(dim=1)
                     correct += predicted.eq(targets).sum().item()
+                        
+                    # _, predicted = outputs.max(1)
+                    # correct += predicted.eq(targets).sum().item()
 
                     # Ensure extend always gets a list/array
                     output_list_target.extend(np.atleast_1d(targets.cpu().numpy()))
                     output_list_predicted.extend(np.atleast_1d(predicted.cpu().numpy()))
+                    # Build per-sample probability dicts
+                    for pb in probs_batch.cpu().numpy():
+                        prob_list.append({str(i): float(pb[i]) for i in range(len(pb))})
 
-                    acc = 100. * correct / total
+                    acc = 100. * correct / total if total > 0 else 0.0
                     desc = (f"Batch {batch_idx}/{len(dataloader)} | "
                             f"Loss: {eval_loss/(batch_idx+1):.3f} | Acc: {acc:.2f}% ({correct}/{total})")
 
@@ -179,7 +204,7 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
                     torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
                     logging.info(f"Checkpoint saved: {modelname}ckpt.pth (Acc: {acc:.2f}%)")
                     best_acc = acc
-                return acc, output_list_target, output_list_predicted
+                return acc, output_list_target, output_list_predicted, prob_list
 
             else:  # regression
                 mse = eval_loss / (batch_idx + 1)
@@ -191,7 +216,7 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
                 }
                 torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
                 logging.info(f"Checkpoint saved: {modelname}ckpt.pth (MSE: {mse:.4f})")
-                return mse, output_list_target, output_list_predicted
+                return mse, output_list_target, output_list_predicted, prob_list
 
     except Exception as e:
         logging.exception(f"Error while saving checkpoint: {e}")
@@ -200,11 +225,11 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
     if modeltype == "classification":
         acc = 100. * correct / total if total > 0 else 0.0
         logging.info(f"Evaluation complete — Accuracy: {acc:.2f}%")
-        return acc, output_list_target, output_list_predicted
+        return acc, output_list_target, output_list_predicted, prob_list
     else:
-        mse = eval_loss / (batch_idx + 1)
+        mse = eval_loss / (batch_idx + 1 if batch_idx >= 0 else 1)
         logging.info(f"Evaluation complete — MSE: {mse:.4f}")
-        return mse, output_list_target, output_list_predicted
+        return mse, output_list_target, output_list_predicted, prob_list
 
 def load_model(model_class, modelname, device="cpu"):
     """
