@@ -1,19 +1,23 @@
+#%%
 import os
 import time
 import logging
 from datetime import datetime
+import argparse
+import sys
 
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from tqdm import tqdm
 
-from config import get_args
+# from config import get_args
 from dataset import load_data, verify_loaders
 from output import combine_results_to_dataframe
 from model import S4Model, setup_optimizer
 from train import train, eval, load_model
 
+#%%
 def setup_logging(log_dir="logs", log_file="training.log"):
     os.makedirs(log_dir, exist_ok=True)
     logging.basicConfig(
@@ -28,12 +32,42 @@ def setup_logging(log_dir="logs", log_file="training.log"):
     console.setFormatter(formatter)
     logging.getLogger().addHandler(console)
 
+#%%
+def get_args():
+    args = argparse.Namespace()
+    args.modelname = "debug_model"
+    args.modeltype = "classification"  # or 'regression'
+    args.dataset = None
+    # args.traintestvalsplit = [0.7, 0.1, 0.2]
+    args.trainset = "D:/CodeLibrary/Python/weathermetrics/data/weathermetrics/72206013889_DAYSUM_bin1_5_20_train.parquet"
+    args.valset = "D:/CodeLibrary/Python/weathermetrics/data/weathermetrics/72206013889_DAYSUM_bin1_5_20_validation.parquet"   
+    args.testset = "D:/CodeLibrary/Python/weathermetrics/data/weathermetrics/72206013889_DAYSUM_bin1_5_20_test.parquet"
+    args.batch_size = 64
+    args.num_workers = 0 
+    args.n_layers = 4
+    args.d_model = 128
+    args.dropout = 0.1
+    args.prenorm = False
+    args.epochs = 1
+    args.lr = 0.01
+    args.weight_decay = 0.01
+    args.grayscale = False
+    args.tabulardata = True
+    args.dependent_variable = "tgt_bin"
+    args.independent_variables = None
+    args.resume = False
+    unknown = []
+    return args, unknown
+
+
+#%%
 def main():
     # Set up logging
     setup_logging()
 
     # Parse arguments
     args, unknown = get_args()
+
     logging.info(f"Training Inputs: {args}")
     logging.info(f"Unknown Inputs: {unknown}")
 
@@ -112,9 +146,9 @@ def main():
         )
 
     end_time = time.perf_counter()
-    elapsed_time = end_time - start_time
+    elapsed_time = end_time - start_time   
     logging.info(f"End Time: {datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')}")
-    logging.info(f"Process completed in {elapsed_time:.2f} seconds")
+    logging.info(f"Process completed in {elapsed_time:.2f} seconds")    
 
     # Save the validation and test datasets
     logging.info("Saving validation and test datasets...")
@@ -122,8 +156,8 @@ def main():
         dep_var = None
         val_name = None
         test_name = None
-        val_prob_list = None
-        test_prob_list = None
+        val_prob_list = []
+        test_prob_list = []
         logging.info("Dataset is CIFAR10 or MNIST; dependent variable and original DataFrames set to None.")
     else:    
         dep_var = args.dependent_variable    
@@ -150,3 +184,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+# %%
+# print(len(values), values[0], values[1][:5], values[2][:5], values[3][:5])

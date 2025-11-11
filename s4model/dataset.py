@@ -236,6 +236,12 @@ def process_tabular_data(dataset_path, dependent_variable, independent_variables
             df = pl.read_csv(dataset_path).fill_null(0)
         elif dataset_path.endswith(".parquet"):
             df = pl.read_parquet(dataset_path, use_pyarrow=True).fill_null(0)
+            # Ensure columns with null/Null dtype are cast to float64
+            for col, dtype in df.schema.items():
+                if dtype is None or "null" in str(dtype).lower():                    
+                    # logging.info(f"Casting column '{col}' with dtype {dtype} to Float64")
+                    df = df.with_columns(pl.col(col).cast(pl.Float64).fill_null(0))
+            logging.warning(f"Columns with null dtype found: Casted them to Float64 and filled null with 0.")                    
         else:
             raise ValueError(f"Unsupported file format: {dataset_path}")
 
