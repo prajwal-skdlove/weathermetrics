@@ -33,7 +33,7 @@ dt_files <- fn_get_file_info("*DAYSUM_bin1_5_20_train")
 
 
 #Create bat file to run s4 models on same data files
-lst_cmds <- unlist(lapply(1:dim(dt_files)[1], function(idx){
+lst_cmds <- unlist(lapply(2:dim(dt_files)[1], function(idx){
   #idx <- 1
   iepochs <- 100
   bat_content <- paste("python -m s4model --modelname",
