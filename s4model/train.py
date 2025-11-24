@@ -33,7 +33,7 @@ def train(model, trainloader, criterion, optimizer, device, modeltype="classific
         raise ValueError(f"Invalid modeltype '{modeltype}'. Use 'classification' or 'regression'.")
 
     model.train()
-    output_list_target, output_list_predicted, prob_list = [], [], []
+    input_list, output_list_target, output_list_predicted, prob_list = [], [], [], []
     train_loss, correct, total = 0, 0, 0
     
     pbar = tqdm(enumerate(trainloader), total=len(trainloader), desc="Training")
@@ -45,6 +45,7 @@ def train(model, trainloader, criterion, optimizer, device, modeltype="classific
 
             # Forward pass
             outputs = model(inputs)
+            input_list.extend(inputs.squeeze().cpu().numpy())
 
             # Handle regression reshaping
             if modeltype == "regression":
@@ -110,11 +111,11 @@ def train(model, trainloader, criterion, optimizer, device, modeltype="classific
     if modeltype == "classification":
         acc = 100. * correct / total if total > 0 else 0.0
         logging.info(f"Training complete — Avg Loss: {avg_loss:.4f}, Accuracy: {acc:.2f}%")
-        return avg_loss, acc, output_list_target, output_list_predicted, prob_list
+        return avg_loss, acc, output_list_target, output_list_predicted, prob_list, input_list
     else:
         acc = None
         logging.info(f"Training complete — Avg Loss (MSE): {avg_loss:.4f}")
-        return avg_loss, acc, output_list_target, output_list_predicted, prob_list
+        return avg_loss, acc, output_list_target, output_list_predicted, prob_list, input_list
 
 
 def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
@@ -150,7 +151,8 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
         logging.error(f"Invalid modeltype: {modeltype}")
         raise ValueError(f"Invalid modeltype '{modeltype}'. Use 'classification' or 'regression'.")
 
-    output_list_target, output_list_predicted, prob_list = [], [], []
+    input_list, output_list_target, output_list_predicted, prob_list = [], [], [], []
+
     model.eval()
     eval_loss, correct, total = 0, 0, 0
 
@@ -160,6 +162,7 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
             try:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = model(inputs)
+                input_list.extend(inputs.squeeze().cpu().numpy())
 
                 # Handle regression reshaping
                 if modeltype == "regression":
@@ -169,7 +172,7 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
                 # Compute loss
                 loss = criterion(outputs, targets)
                 eval_loss += loss.item()
-                total += targets.size(0)
+                total += targets.size(0)                
 
                 if modeltype == "classification":
                     # Compute probabilities
@@ -230,7 +233,7 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
                     torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
                     logging.info(f"Checkpoint saved: {modelname}ckpt.pth (Acc: {acc:.2f}%)")
                     best_acc = acc
-                return acc, output_list_target, output_list_predicted, prob_list
+                return acc, output_list_target, output_list_predicted, prob_list, input_list
 
             else:  # regression
                 mse = eval_loss / (batch_idx + 1)
@@ -242,7 +245,7 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
                 }
                 torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
                 logging.info(f"Checkpoint saved: {modelname}ckpt.pth (MSE: {mse:.4f})")
-                return mse, output_list_target, output_list_predicted, prob_list
+                return mse, output_list_target, output_list_predicted, prob_list, input_list
 
     except Exception as e:
         logging.exception(f"Error while saving checkpoint: {e}")
@@ -251,11 +254,11 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
     if modeltype == "classification":
         acc = 100. * correct / total if total > 0 else 0.0
         logging.info(f"Evaluation complete — Accuracy: {acc:.2f}%")
-        return acc, output_list_target, output_list_predicted, prob_list
+        return acc, output_list_target, output_list_predicted, prob_list, input_list
     else:
         mse = eval_loss / (batch_idx + 1 if batch_idx >= 0 else 1)
         logging.info(f"Evaluation complete — MSE: {mse:.4f}")
-        return mse, output_list_target, output_list_predicted, prob_list
+        return mse, output_list_target, output_list_predicted, prob_list, input_list
 
 def load_model(model_class, modelname, device="cpu"):
     """

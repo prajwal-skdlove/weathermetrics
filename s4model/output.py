@@ -7,9 +7,11 @@ import logging
 #%%
 def combine_results_to_dataframe(
     dataloader=None,
+    input_list=None,
     target_list=None,
     predicted_list=None,
     dependent_variable=None,
+    independent_variables=None,
     extra_features=None,
     valset=None,
     original_df=None,
@@ -21,9 +23,11 @@ def combine_results_to_dataframe(
 
     Args:
         dataloader: Optional data loader object containing the dataset
+        input_list: Optional list of input features
         target_list: List of target/actual values
         predicted_list: List of predicted values from the model
         dependent_variable: Name of the target variable column (default: 'Target')
+        independent_variables: List of names for input feature columns (default: None)
         extra_features: List of lists/dictionaries containing additional features
         valset: Optional validation dataset
         original_df: Optional original DataFrame
@@ -70,6 +74,15 @@ def combine_results_to_dataframe(
             "extra_features": extra_features
         })
 
+        # Validate input_list length and add it to the results DataFrame
+        if input_list is not None:
+            if len(input_list) != expected_len:
+                raise Warning("input_list must have the same length as target_list and predicted_list.")                 
+            
+            input_df = pd.DataFrame(input_list, columns=independent_variables)
+            df_results = pd.concat([df_results, input_df], axis=1)
+                
+
         # Ensure results directory exists
         results_dir = "../results/"
         os.makedirs(results_dir, exist_ok=True)
@@ -93,9 +106,11 @@ def combine_results_to_dataframe(
 
 # combine_results_to_dataframe(
 #     dataloader=None,
+#     input_list=None,
 #     target_list=[0, 1, 0, 1],
 #     predicted_list=[0.1, 0.9, 0.2, 0.8 ],
 #     dependent_variable='tgt_bin',
+#     independent_variables=None,
 #     extra_features=   [
 #                     {"0" : 0.245, "1" : 0.755, "2" : 0.345, "3" : 0.845},         
 #                     {"0" : 0.15, "1" : 0.85, "2" : 0.25, "3" : 0.95}, 
@@ -113,6 +128,7 @@ def save_results(
     predictions=None,
     target_list=None,
     dependent_variable=None,
+    independent_variables=None,
     extra_features=None,
     input_df=None,
     name=None
@@ -121,10 +137,11 @@ def save_results(
     Saves inference results in a pandas DataFrame and (optionally) as a CSV file.
 
     Args:
-        input_data: Optional input data used for inference.
+        input_data: Optional input data used for inference. send it as list
         predictions (list): List of predicted values from the model.
         target_list (list, optional): List of actual/target values. If None, target column will be empty.
         dependent_variable (str, optional): Name of the target variable column. Defaults to 'Target'.
+        independent_variables (list, optional): List of names for input feature columns. Defaults to None.
         extra_features (list, optional): List of additional features (dicts/lists) for each sample.
         input_df (pd.DataFrame, optional): Original input DataFrame.
         name (str, optional): Prefix for the saved file name.
@@ -167,6 +184,14 @@ def save_results(
             "extra_features": extra_features if extra_features is not None else []
         })
 
+         # Validate input_list length and add it to the results DataFrame
+        if input_data is not None:
+            if len(input_data) != expected_len:
+                raise Warning("input_data must have the same length as target_list and predicted_list.")                              
+            
+            input_df = pd.DataFrame(input_data, columns=independent_variables)
+            df_results = pd.concat([df_results, input_df], axis=1)
+
         return df_results
 
     except Exception as e:
@@ -179,6 +204,7 @@ def save_results(
 #     predictions=[0.1, 0.9, 0.2, 0.8 ],
 #     target_list=[0, 1, 0, 1],
 #     dependent_variable='tgt_bin',
+#     independent_variables= None,
 #     input_df=None,    
 #     name = 'test',
 #     extra_features = [{"0" : 0.245, "1" : 0.755, "2" : 0.345, "3" : 0.845}, 

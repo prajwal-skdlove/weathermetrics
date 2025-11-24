@@ -36,7 +36,7 @@ def setup_logging(log_dir="logs", log_file="training.log"):
 def get_args():
     args = argparse.Namespace()
     args.modelname = "debug_model"
-    args.modeltype = "classification"  # or 'regression' 'classification'
+    args.modeltype = "regression"  # or 'regression' 'classification'
     args.dataset = None
     # args.traintestvalsplit = [0.7, 0.1, 0.2]
     args.trainset = "D:/CodeLibrary/Python/weathermetrics/data/weathermetrics/72206013889_DAYSUM_bin1_5_20_train.parquet"
@@ -125,16 +125,17 @@ def main():
     pbar = tqdm(range(start_epoch, args.epochs), desc="Training")
 
     for epoch in pbar:
-        avg_loss, acc, train_target, train_predicted, train_prob_list = train(model, trainloader, criterion, optimizer, device, modeltype=args.modeltype)
+        avg_loss, acc, train_target, train_predicted, train_prob_list, train_input_list = train(
+            model, trainloader, criterion, optimizer, device, modeltype=args.modeltype)
         if args.modeltype == "classification":
             pbar.set_description(f"Epoch: {epoch + 1} | Train acc: {acc:.3f}%")
         elif args.modeltype == "regression":
             pbar.set_description(f"Epoch: {epoch + 1} | Train MSE: {avg_loss:.3f}")
-        val_metric, val_target, val_predicted, val_prob_list = eval(
+        val_metric, val_target, val_predicted, val_prob_list, val_input_list = eval(
             model, valloader, criterion, device, epoch, args.modelname, best_acc, args,
             modeltype=args.modeltype, checkpoint=True
         )
-        test_metric, test_target, test_predicted, test_prob_list = eval(
+        test_metric, test_target, test_predicted, test_prob_list, test_input_list = eval(
             model, testloader, criterion, device, epoch, args.modelname, best_acc, args,
             modeltype=args.modeltype, checkpoint=True
         )
@@ -155,49 +156,63 @@ def main():
     logging.info(f"Process completed in {elapsed_time:.2f} seconds")    
 
     # Save the validation and test datasets
-    logging.info("Saving validation and test datasets...")
+    # logging.info("Saving validation and test datasets...")
     if args.dataset == 'cifar10' or args.dataset == 'mnist':    
-        dep_var = None
+        dep_var, independent_variables = None, None
         train_name = None
         val_name = None
         test_name = None
-        train_prob_list = []
-        val_prob_list = []
-        test_prob_list = []
+        train_input_list, val_input_list, test_input_list = None, None, None
+        train_prob_list, val_prob_list, test_prob_list = [], [], []        
         logging.info("Dataset is CIFAR10 or MNIST; dependent variable and original DataFrames set to None.")
     else:    
-        dep_var = args.dependent_variable    
+        dep_var = args.dependent_variable 
+        independent_variables = args.independent_variables   
         train_name = train_df if df is None else df
         val_name = test_df if df is None else df
         test_name = test_df if df is None else df
+        train_input_list, val_input_list, test_input_list = None, None, None
         logging.info(f"Dependent variable: {dep_var}")
+        logging.info(f"Training DataFrame: {'train_df' if df is None else 'df'}")
         logging.info(f"Validation DataFrame: {'test_df' if df is None else 'df'}")
         logging.info(f"Test DataFrame: {'test_df' if df is None else 'df'}")
 
     df_train = combine_results_to_dataframe(
-        trainloader, train_target, train_predicted,
-        dependent_variable=dep_var, extra_features = train_prob_list, valset=trainset,
+        trainloader, train_input_list, train_target, train_predicted,
+        dependent_variable=dep_var, independent_variables= independent_variables, 
+        extra_features = train_prob_list, valset=trainset,
         original_df=train_name, name=f'{args.modelname}_Train'
     )
-    logging.info(f"Training results DataFrame created with shape: {df_train.shape}")
-
+    logging.info(f"Training results DataFrame created with shape: {df_train.shape}")    
+        
     df_validation = combine_results_to_dataframe(
-        valloader, val_target, val_predicted,
-        dependent_variable=dep_var, extra_features = val_prob_list, valset=valset,
+        valloader, val_input_list, val_target, val_predicted,
+        dependent_variable=dep_var, independent_variables=independent_variables, 
+        extra_features = val_prob_list, valset=valset,
         original_df=val_name, name=f'{args.modelname}_Validation'
     )
     logging.info(f"Validation results DataFrame created with shape: {df_validation.shape}")
 
     df_test = combine_results_to_dataframe(
-        testloader, test_target, test_predicted,
-        dependent_variable=dep_var, extra_features = test_prob_list, valset=testset,
+        testloader, test_input_list, test_target, test_predicted,
+        dependent_variable=dep_var, independent_variables=independent_variables, 
+        extra_features = test_prob_list, valset=testset,
         original_df=test_name, name=f'{args.modelname}_Test'
     )
     logging.info(f"Test results DataFrame created with shape: {df_test.shape}")
 
-
+    # return train_target, train_predicted, train_prob_list, train_input_list, args.independent_variables
 if __name__ == "__main__":
     main()
 # %%
 # print(len(values), values[0], values[1][:5], values[2][:5], values[3][:5])
+# import pandas as pd
+# import numpy as np
+
+# #%%
+# df_train = combine_results_to_dataframe(
+#         dataloader = None, input_list = train_input_list, target_list = train_target, predicted_list = train_predicted,
+#         dependent_variable=None, independent_variables= independent_variables, extra_features = train_prob_list, valset=None,
+#         original_df=None, name='_Train'
+#     )    
 # %%
