@@ -46,6 +46,10 @@ def get_args():
     parser.add_argument('--lr', type=float, default=0.01, help="Learning rate")
     parser.add_argument('--weight_decay', type=float, default=0.01, help="Weight decay")
 
+    # Output data
+    parser.add_argument('--output_data', action='store_true', default=False, 
+                        help="Output data with the predictions (default: False) — set this flag to enable outputting input datasets along with predictions as part of the final dataset.")
+
     try:
         args, unknown = parser.parse_known_args()
 

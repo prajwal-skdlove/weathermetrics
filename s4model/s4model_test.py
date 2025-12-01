@@ -56,6 +56,7 @@ def get_args():
     args.dependent_variable = "tgt_bin"
     args.independent_variables = None
     args.resume = False
+    args.output_data = False
     unknown = []
     return args, unknown
 
@@ -171,7 +172,12 @@ def main():
         train_name = train_df if df is None else df
         val_name = test_df if df is None else df
         test_name = test_df if df is None else df
-        train_input_list, val_input_list, test_input_list = None, None, None
+        if not args.output_data:
+            train_input_list, val_input_list, test_input_list = None, None, None 
+            logging.info("Output data flag not set; input data lists set to None.")
+        else:
+            logging.info("Output data flag set; including input data lists.")
+        #     train_input_list, val_input_list, test_input_list = train_input_list, val_input_list, test_input_list        
         logging.info(f"Dependent variable: {dep_var}")
         logging.info(f"Training DataFrame: {'train_df' if df is None else 'df'}")
         logging.info(f"Validation DataFrame: {'test_df' if df is None else 'df'}")

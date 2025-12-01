@@ -139,7 +139,12 @@ def main():
         val_name = train_df if df is None else df
         test_name = test_df if df is None else df
         # comment this out to send actual input data. the datasets are too big, consider if really needed to do it
-        train_input_list, val_input_list, test_input_list = None, None, None 
+        if not args.output_data:
+            train_input_list, val_input_list, test_input_list = None, None, None 
+            logging.info("Output data flag not set; input data lists set to None.")
+        else:
+            logging.info("Output data flag set; including input data lists.")
+        #     train_input_list, val_input_list, test_input_list = train_input_list, val_input_list, test_input_list
         logging.info(f"Dependent variable: {dep_var}")
         logging.info(f"Validation DataFrame: {'train_df' if df is None else 'df'}")
         logging.info(f"Test DataFrame: {'test_df' if df is None else 'df'}")
