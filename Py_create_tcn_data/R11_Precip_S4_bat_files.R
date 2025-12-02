@@ -37,7 +37,6 @@ int_files <- 1:5 #dim(dt_files)[1]
 iepochs <- 100
 
 lst_cmds <- unlist(lapply(int_files, function(idx){
-  #idx <- 1
   bat_content <- paste("python -m s4model --modelname",
                        paste("s4",dt_files$stid[idx],"DAYSUM_bin1_5_20",sep="_"),
                        "--modeltype classification --dataset ",
