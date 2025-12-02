@@ -1,0 +1,1 @@
+python -m s4model --modelname s4_70219026615_DAYSUM_bin1_5_20 --modeltype classification --dataset  C:/Users/jhugh/Documents/Py_S4/NCEI_parquet_files/70219026615_DAYSUM_bin1_5_20_train.parquet  --tabulardata --dependent_variable tgt_bin --epochs  100
