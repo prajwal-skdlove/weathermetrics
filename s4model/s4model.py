@@ -90,13 +90,19 @@ def main():
     start_time = time.perf_counter()
     pbar = tqdm(range(start_epoch, args.epochs), desc="Training")
 
-    for epoch in pbar:
-        train(model, trainloader, criterion, optimizer, device, modeltype=args.modeltype)
-        val_metric, val_target, val_predicted, val_prob_list = eval(
+    for epoch in pbar:        
+        avg_loss, acc, train_target, train_predicted, train_prob_list, train_input_list = train(
+            model, trainloader, criterion, optimizer, device, modeltype=args.modeltype)
+        if args.modeltype == "classification":
+            pbar.set_description(f"Epoch: {epoch + 1} | Train acc: {acc:.3f}%")
+        elif args.modeltype == "regression":
+            pbar.set_description(f"Epoch: {epoch + 1} | Train MSE: {avg_loss:.3f}")
+
+        val_metric, val_target, val_predicted, val_prob_list, val_input_list= eval(
             model, valloader, criterion, device, epoch, args.modelname, best_acc, args,
             modeltype=args.modeltype, checkpoint=True
         )
-        test_metric, test_target, test_predicted, test_prob_list = eval(
+        test_metric, test_target, test_predicted, test_prob_list, test_input_list = eval(
             model, testloader, criterion, device, epoch, args.modelname, best_acc, args,
             modeltype=args.modeltype, checkpoint=True
         )
@@ -119,34 +125,53 @@ def main():
     # Save the validation and test datasets
     logging.info("Saving validation and test datasets...")
     if args.dataset == 'cifar10' or args.dataset == 'mnist':    
-        dep_var = None
+        dep_var, independent_variables = None, None
+        train_name = None
         val_name = None
         test_name = None
-        val_prob_list = None
-        test_prob_list = None
+        train_input_list, val_input_list, test_input_list = None, None, None
+        train_prob_list, val_prob_list, test_prob_list = [], [], []  
         logging.info("Dataset is CIFAR10 or MNIST; dependent variable and original DataFrames set to None.")
-    else:    
+    else:              
         dep_var = args.dependent_variable    
+        independent_variables = args.independent_variables   
+        train_name = train_df if df is None else df
         val_name = train_df if df is None else df
         test_name = test_df if df is None else df
+        # comment this out to send actual input data. the datasets are too big, consider if really needed to do it
+        if not args.output_data:
+            train_input_list, val_input_list, test_input_list = None, None, None 
+            logging.info("Output data flag not set; input data lists set to None.")
+        else:
+            logging.info("Output data flag set; including input data lists.")
+        #     train_input_list, val_input_list, test_input_list = train_input_list, val_input_list, test_input_list
         logging.info(f"Dependent variable: {dep_var}")
         logging.info(f"Validation DataFrame: {'train_df' if df is None else 'df'}")
         logging.info(f"Test DataFrame: {'test_df' if df is None else 'df'}")
 
+    df_train = combine_results_to_dataframe(
+        trainloader, train_input_list, train_target, train_predicted,
+        dependent_variable=dep_var, independent_variables= independent_variables, 
+        extra_features = train_prob_list, valset=trainset,
+        original_df=train_name, name=f'{args.modelname}_Train'
+    )
+    logging.info(f"Training results DataFrame created with shape: {df_train.shape}")    
+        
     df_validation = combine_results_to_dataframe(
-        valloader, val_target, val_predicted,
-        dependent_variable=dep_var, extra_features = val_prob_list, valset=valset,
+        valloader, val_input_list, val_target, val_predicted,
+        dependent_variable=dep_var, independent_variables=independent_variables, 
+        extra_features = val_prob_list, valset=valset,
         original_df=val_name, name=f'{args.modelname}_Validation'
     )
     logging.info(f"Validation results DataFrame created with shape: {df_validation.shape}")
 
     df_test = combine_results_to_dataframe(
-        testloader, test_target, test_predicted,
-        dependent_variable=dep_var, extra_features = test_prob_list, valset=testset,
+        testloader, test_input_list, test_target, test_predicted,
+        dependent_variable=dep_var, independent_variables=independent_variables, 
+        extra_features = test_prob_list, valset=testset,
         original_df=test_name, name=f'{args.modelname}_Test'
     )
     logging.info(f"Test results DataFrame created with shape: {df_test.shape}")
-
 
 if __name__ == "__main__":
     main()
