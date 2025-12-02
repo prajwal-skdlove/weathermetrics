@@ -6,13 +6,51 @@ library(nnet)
 library(caret)
 
 # Get list of files
-fn_get_file_info_s4 <- function(ptrn){
+fn_get_file_info_s4_Test <- function(ptrn){
   wd01 <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\results"
   fpattern <- ptrn
   lst_data_filename <- list.files(wd01,pattern=fpattern,full.names =FALSE)
   test_results <- grep("Test_results",lst_data_filename)
   lst_data_filename <- lst_data_filename[test_results]
   lst_data_files <- list.files(wd01,pattern=fpattern,full.names =TRUE)[test_results]
+  lst_file_size <- as.vector(Reduce(rbind,as.numeric(lapply(lst_data_files, function(xf){
+    mbs <- file.size(xf)/(1024*1024)
+    mbs
+  }))))
+  
+  dt_infiles <- data.table('Fname'=lst_data_filename,
+                           'Fpath'=lst_data_files,
+                           'Fsize'=lst_file_size)
+  dt_infiles[,stid := substr(Fname,11,21)]
+  return(dt_infiles)
+}
+
+fn_get_file_info_s4_Valid <- function(ptrn){
+  wd01 <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\results"
+  fpattern <- ptrn
+  lst_data_filename <- list.files(wd01,pattern=fpattern,full.names =FALSE)
+  test_results <- grep("Test_results",lst_data_filename)
+  lst_data_filename <- lst_data_filename[test_results]
+  lst_data_files <- list.files(wd01,pattern=fpattern,full.names =TRUE)[test_results]
+  lst_file_size <- as.vector(Reduce(rbind,as.numeric(lapply(lst_data_files, function(xf){
+    mbs <- file.size(xf)/(1024*1024)
+    mbs
+  }))))
+  
+  dt_infiles <- data.table('Fname'=lst_data_filename,
+                           'Fpath'=lst_data_files,
+                           'Fsize'=lst_file_size)
+  dt_infiles[,stid := substr(Fname,11,21)]
+  return(dt_infiles)
+}
+
+fn_get_file_info_s4_Train <- function(ptrn){
+  wd01 <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\results"
+  fpattern <- ptrn
+  lst_data_filename <- list.files(wd01,pattern=fpattern,full.names =FALSE)
+  train_results <- grep("Train_results",lst_data_filename)
+  lst_data_filename <- lst_data_filename[train_results]
+  lst_data_files <- list.files(wd01,pattern=fpattern,full.names =TRUE)[train_results]
   lst_file_size <- as.vector(Reduce(rbind,as.numeric(lapply(lst_data_files, function(xf){
     mbs <- file.size(xf)/(1024*1024)
     mbs
@@ -74,9 +112,12 @@ fn_summarize_confmat <- function(ix){
   dt_res
 }
 
-dt_files <- fn_get_file_info_s4("*DAYSUM_bin1_5_20_Test")
+dt_files_Test <- fn_get_file_info_s4_Test("*DAYSUM_bin1_5_20_Test")
+dt_files_Train <- fn_get_file_info_s4_Train("*DAYSUM_bin1_5_20_Train")
+dt_files_Valid <- fn_get_file_info_s4_Valid("*DAYSUM_bin1_5_20_Valid")
 
-xlist <- c(1:11,14,16,18:22,24:32)  #dim(dt_files)[1]
+
+xlist <- c(1:3)  #dim(dt_files)[1]
 lst_results <- lapply(xlist, function(xf){
     res <- fn_conmat_s4(dt_files[xf])
     res})
