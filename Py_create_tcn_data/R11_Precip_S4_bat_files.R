@@ -33,7 +33,7 @@ dt_files <- fn_get_file_info("*DAYSUM_bin1_5_20_train")
 
 
 #Create bat file to run s4 models on same data files
-int_files <- 1:dim(dt_files)[1]
+int_files <- 1:5 #dim(dt_files)[1]
 iepochs <- 100
 
 lst_cmds <- unlist(lapply(int_files, function(idx){
@@ -42,7 +42,7 @@ lst_cmds <- unlist(lapply(int_files, function(idx){
                        paste("s4",dt_files$stid[idx],"DAYSUM_bin1_5_20",sep="_"),
                        "--modeltype classification --dataset ",
                        dt_files$Fpath[idx],
-                       " --tabulardata --dependent_variable tgt_bin --epochs ",
+                       " --tabulardata --output_data --dependent_variable tgt_bin --epochs ",
                        iepochs,
                        sep=" ")
   bat_content
