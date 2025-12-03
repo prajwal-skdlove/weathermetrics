@@ -21,7 +21,8 @@ fn_get_file_info_s4_Test <- function(ptrn){
   dt_infiles <- data.table('Fname'=lst_data_filename,
                            'Fpath'=lst_data_files,
                            'Fsize'=lst_file_size)
-  dt_infiles[,stid := substr(Fname,11,21)]
+  dt_infiles[,stid := substr(Fname,4,14)]
+  dt_infiles[,ftype := "Test"]
   return(dt_infiles)
 }
 
@@ -29,7 +30,7 @@ fn_get_file_info_s4_Valid <- function(ptrn){
   wd01 <- "C:\\Users\\jhugh\\Documents\\GitHub\\Py_Weather_S4\\weathermetrics\\results"
   fpattern <- ptrn
   lst_data_filename <- list.files(wd01,pattern=fpattern,full.names =FALSE)
-  test_results <- grep("Test_results",lst_data_filename)
+  test_results <- grep("Validation_results",lst_data_filename)
   lst_data_filename <- lst_data_filename[test_results]
   lst_data_files <- list.files(wd01,pattern=fpattern,full.names =TRUE)[test_results]
   lst_file_size <- as.vector(Reduce(rbind,as.numeric(lapply(lst_data_files, function(xf){
@@ -40,7 +41,8 @@ fn_get_file_info_s4_Valid <- function(ptrn){
   dt_infiles <- data.table('Fname'=lst_data_filename,
                            'Fpath'=lst_data_files,
                            'Fsize'=lst_file_size)
-  dt_infiles[,stid := substr(Fname,11,21)]
+  dt_infiles[,stid := substr(Fname,4,14)]
+  dt_infiles[,ftype := "Valid"]
   return(dt_infiles)
 }
 
@@ -59,8 +61,35 @@ fn_get_file_info_s4_Train <- function(ptrn){
   dt_infiles <- data.table('Fname'=lst_data_filename,
                            'Fpath'=lst_data_files,
                            'Fsize'=lst_file_size)
-  dt_infiles[,stid := substr(Fname,11,21)]
+  dt_infiles[,stid := substr(Fname,4,14)]
+  dt_infiles[,ftype := "Train"]
   return(dt_infiles)
+}
+
+# Check conf matrix for each model
+fn_reorg_s4 <- function(ipf){
+  infile <- ipf$Fpath
+  stdid <- ipf$stid
+  attr(stdid,"names") <- "Station ID"
+  dt01 <- fread(infile)
+  
+  #tbl <- table(dt01$tgt_bin,dt01$Predicted)
+  #names(dimnames(tbl)) <- list("Actual (row)","Predicted (col)")
+  
+  #dt01[,tgt_has_rain := factor(ifelse(tgt_bin == 0,FALSE,TRUE))]
+  #dt01[,prd_has_rain := factor(ifelse(Predicted == 0,FALSE,TRUE))]
+  ##print(table(dt01$tgt_has_rain,dt01$prd_has_rain))
+  #cm <- confusionMatrix(data = dt01$tgt_has_rain, 
+  #                      reference = dt01$prd_has_rain, 
+  #                      positive = "TRUE")
+  #Precision <- cm$byClass[match("Precision",attr(cm$byClass,"names"))]
+  #Recall <- cm$byClass[match("Sensitivity",attr(cm$byClass,"names"))]
+  #attr(Recall,"names") <- "Recall"
+  
+  #lst_rtn <- list(stdid,tbl,cm,list(Precision,Recall))
+  
+  return(dt01)
+  
 }
 
 # Check conf matrix for each model
@@ -116,21 +145,57 @@ dt_files_Test <- fn_get_file_info_s4_Test("*DAYSUM_bin1_5_20_Test")
 dt_files_Train <- fn_get_file_info_s4_Train("*DAYSUM_bin1_5_20_Train")
 dt_files_Valid <- fn_get_file_info_s4_Valid("*DAYSUM_bin1_5_20_Valid")
 
+dt_files <- Reduce(rbind,list(dt_files_Test,dt_files_Train,dt_files_Valid))
 
-xlist <- c(1:3)  #dim(dt_files)[1]
+all_stid <- unique(dt_files$stid)
+
+#Select files to process
+xlist <- c(11)  #dim(dt_files)[1]
 lst_results <- lapply(xlist, function(xf){
-    res <- fn_conmat_s4(dt_files[xf])
+    res <- fn_reorg_s4(dt_files[xf])
     res})
 length(lst_results)
 
-lst_cm <- lapply(lst_results, function(xi) fn_summarize_confmat(xi))
+#Select single data file
+xf <- 11
 
-  df_out <- lst_cm[[1]]
-  precision <- df_out[Metric == 'Precision',"Value"]
-  recall <- df_out[Metric == 'Recall',"Value"]
-  s4_output <- xtabs(df_out$N.x ~ df_out$`Actual (row)` + df_out$`Predicted (col)`)
-  bin_output <- xtabs(df_out$N.y ~ df_out$`Prediction` + df_out$`Reference`)
+curr_dt <- lst_results[[1]]
+dt_outcome <- curr_dt[,1:2]
+dt_features <- curr_dt[,4:dim(curr_dt)[2]]
+dt_prob <- data.table(curr_dt[,3])
+dt_prob[, str_prob := substr(as.character(extra_features),2,nchar(as.character(extra_features))-1)]
 
+dt_prob[,pval_0 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
+    ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][1]
+    ss <- as.numeric(strsplit(ss,":")[[1]][2])
+    ss
+    })))]
 
+dt_prob[,pval_1 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
+    ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][2]
+    ss <- as.numeric(strsplit(ss,":")[[1]][2])
+    ss
+    })))]
+
+dt_prob[,pval_2 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
+    ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][3]
+    ss <- as.numeric(strsplit(ss,":")[[1]][2])
+    ss
+    })))]
+
+dt_prob[,pval_3 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
+    ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][4]
+    ss <- as.numeric(strsplit(ss,":")[[1]][2])
+    ss
+    })))]
+
+dt_prob <- dt_prob[,3:6]
+
+dt_output <- cbind(dt_outcome,dt_prob)
+dt_output <- cbind(dt_output,dt_features)
+
+oname <- dt_files[xf]$Fpath
+oname <- gsub(".csv","_recomb.csv",oname)
+oname
 
 
