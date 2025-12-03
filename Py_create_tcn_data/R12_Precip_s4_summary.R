@@ -147,55 +147,71 @@ dt_files_Valid <- fn_get_file_info_s4_Valid("*DAYSUM_bin1_5_20_Valid")
 
 dt_files <- Reduce(rbind,list(dt_files_Test,dt_files_Train,dt_files_Valid))
 
+#Identify the unique stations in the data
 all_stid <- unique(dt_files$stid)
 
-#Select files to process
-xlist <- c(11)  #dim(dt_files)[1]
+curr_stid <- all_stid[2]
+curr_files <- dt_files[stid == curr_stid,]
+
+#Select files to process for a station
+xlist <- 1:dim(curr_files)[1]
+
 lst_results <- lapply(xlist, function(xf){
-    res <- fn_reorg_s4(dt_files[xf])
+    res <- fn_reorg_s4(curr_files[xf])
     res})
 length(lst_results)
 
 #Select single data file
-xf <- 11
+lst_reorg <- lapply(lst_results,function(xf){
+  curr_dt <- xf
+  dt_outcome <- curr_dt[,1:2]
+  dt_features <- curr_dt[,4:dim(curr_dt)[2]]
+  dt_prob <- data.table(curr_dt[,3])
+  dt_prob[, str_prob := substr(as.character(extra_features),2,nchar(as.character(extra_features))-1)]
 
-curr_dt <- lst_results[[1]]
-dt_outcome <- curr_dt[,1:2]
-dt_features <- curr_dt[,4:dim(curr_dt)[2]]
-dt_prob <- data.table(curr_dt[,3])
-dt_prob[, str_prob := substr(as.character(extra_features),2,nchar(as.character(extra_features))-1)]
+  dt_prob[,pval_0 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
+      ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][1]
+      ss <- as.numeric(strsplit(ss,":")[[1]][2])
+      ss
+      })))]
 
-dt_prob[,pval_0 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
-    ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][1]
-    ss <- as.numeric(strsplit(ss,":")[[1]][2])
-    ss
-    })))]
+  dt_prob[,pval_1 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
+      ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][2]
+      ss <- as.numeric(strsplit(ss,":")[[1]][2])
+      ss
+      })))]
 
-dt_prob[,pval_1 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
-    ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][2]
-    ss <- as.numeric(strsplit(ss,":")[[1]][2])
-    ss
-    })))]
+  dt_prob[,pval_2 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
+      ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][3]
+      ss <- as.numeric(strsplit(ss,":")[[1]][2])
+      ss
+      })))]
 
-dt_prob[,pval_2 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
-    ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][3]
-    ss <- as.numeric(strsplit(ss,":")[[1]][2])
-    ss
-    })))]
+  dt_prob[,pval_3 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
+      ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][4]
+      ss <- as.numeric(strsplit(ss,":")[[1]][2])
+      ss
+      })))]
 
-dt_prob[,pval_3 := as.vector(Reduce(cbind,lapply(1:dim(dt_prob)[1],function(xi) {
-    ss <- strsplit(as.character(dt_prob[xi,2]),",")[[1]][4]
-    ss <- as.numeric(strsplit(ss,":")[[1]][2])
-    ss
-    })))]
+  dt_prob <- dt_prob[,3:6]
 
-dt_prob <- dt_prob[,3:6]
+  dt_output <- cbind(dt_outcome,dt_prob)
+  dt_output <- cbind(dt_output,dt_features)
 
-dt_output <- cbind(dt_outcome,dt_prob)
-dt_output <- cbind(dt_output,dt_features)
+  dt_output
+})
+length(lst_reorg)
 
-oname <- dt_files[xf]$Fpath
-oname <- gsub(".csv","_recomb.csv",oname)
+#Concatenate the three data sets
+all_data <- Reduce(rbind,lst_reorg)
+rm(lst_reorg)
+
+oname <- curr_files$Fpath[1]
+oname <- gsub(".csv","_recomb.parquet",oname)
+oname <- gsub("Test_results","results",oname)
 oname
 
+#Save the file as a parquet file
+
+write_parquet(all_data, oname)
 
