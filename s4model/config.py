@@ -1,7 +1,6 @@
 import argparse
 import logging
 import sys
-
 def get_args():
     """
     Parse and validate command line arguments with robust logging and error handling.
@@ -49,6 +48,10 @@ def get_args():
     # Output data
     parser.add_argument('--output_data', action='store_true', default=False, 
                         help="Output data with the predictions (default: False) — set this flag to enable outputting input datasets along with predictions as part of the final dataset.")
+
+    if '--help' in sys.argv:
+        parser.print_help()
+        sys.exit(0)
 
     try:
         args, unknown = parser.parse_known_args()
