@@ -2,6 +2,8 @@ import pandas as pd
 import os
 from datetime import datetime
 import logging
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 
 #%%
@@ -15,7 +17,8 @@ def combine_results_to_dataframe(
     extra_features=None,
     valset=None,
     original_df=None,
-    name=None
+    name=None,
+    csv = False
 ):
     """
     Combines input features with target and predicted values into a DataFrame.
@@ -90,12 +93,16 @@ def combine_results_to_dataframe(
 
         # Generate timestamped filename
         timestamp = datetime.now().strftime("%Y%m%d_%I%M%S%p")
-        filename = f"{results_dir}{name}_results_{timestamp}.csv"
+        filename = f"{results_dir}{name}_results_{timestamp}"
 
-        # Save to CSV
-        df_results.to_csv(filename, index=False)
-        logging.info(f"Dataset successfully saved as '{filename}'")
-        print(f"Dataset successfully saved as '{filename}'")
+        if csv:
+            filename += '.csv'
+            df_results.to_csv(filename, index=False)         
+        else:
+            filename = filename + '.parquet'
+            df_results.to_parquet(filename, index=False)           
+        
+        logging.info(f"Dataset successfully saved as '{filename}'")        
 
         return df_results
 

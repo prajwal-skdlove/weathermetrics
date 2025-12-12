@@ -3,17 +3,6 @@ import time
 import logging
 from datetime import datetime
 
-import torch
-import torch.backends.cudnn as cudnn
-import torch.nn as nn
-from tqdm import tqdm
-
-from config import get_args
-from dataset import load_data, verify_loaders
-from output import combine_results_to_dataframe
-from model import S4Model, setup_optimizer
-from train import train, eval, load_model
-
 def setup_logging(log_dir="logs", log_file="training.log"):
     os.makedirs(log_dir, exist_ok=True)
     logging.basicConfig(
@@ -32,10 +21,21 @@ def main():
     # Set up logging
     setup_logging()
 
-    # Parse arguments
+    from config import get_args
+    # Parse argumentstorch
     args, unknown = get_args()
     logging.info(f"Training Inputs: {args}")
     logging.info(f"Unknown Inputs: {unknown}")
+
+    import torch
+    import torch.backends.cudnn as cudnn
+    import torch.nn as nn
+    from tqdm import tqdm    
+    from dataset import load_data, verify_loaders
+    from output import combine_results_to_dataframe
+    from model import S4Model, setup_optimizer
+    from train import train, eval, load_model
+
 
     # Set device
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -153,7 +153,7 @@ def main():
         trainloader, train_input_list, train_target, train_predicted,
         dependent_variable=dep_var, independent_variables= independent_variables, 
         extra_features = train_prob_list, valset=trainset,
-        original_df=train_name, name=f'{args.modelname}_Train'
+        original_df=train_name, name=f'{args.modelname}_Train', csv = args.csv
     )
     logging.info(f"Training results DataFrame created with shape: {df_train.shape}")    
         
@@ -161,7 +161,7 @@ def main():
         valloader, val_input_list, val_target, val_predicted,
         dependent_variable=dep_var, independent_variables=independent_variables, 
         extra_features = val_prob_list, valset=valset,
-        original_df=val_name, name=f'{args.modelname}_Validation'
+        original_df=val_name, name=f'{args.modelname}_Validation', csv = args.csv
     )
     logging.info(f"Validation results DataFrame created with shape: {df_validation.shape}")
 
@@ -169,7 +169,7 @@ def main():
         testloader, test_input_list, test_target, test_predicted,
         dependent_variable=dep_var, independent_variables=independent_variables, 
         extra_features = test_prob_list, valset=testset,
-        original_df=test_name, name=f'{args.modelname}_Test'
+        original_df=test_name, name=f'{args.modelname}_Test', csv = args.csv
     )
     logging.info(f"Test results DataFrame created with shape: {df_test.shape}")
 

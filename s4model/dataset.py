@@ -1,7 +1,7 @@
 #%%
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, random_split, DataLoader
+from torch.utils.data import Dataset, random_split, DataLoader, Subset
 import torchvision.transforms as transforms
 import torchvision
 import warnings
@@ -86,86 +86,41 @@ def split_dataset(dataset, splits=[0.7, 0.1, 0.2], seed=42):
 # Split Time Series dataset
 # -------------------------------------------------------------------------
 
-def split_time_series_data(df, train_ratio=0.7, val_ratio=0.1, test_ratio=0.2):
-    """
-    Splits a time series dataset into training, validation, and test sets.
-    Works with pandas.DataFrame, polars.DataFrame, and polars.LazyFrame.
-    Uses lazy evaluation for polars LazyFrame.
+def split_time_series_data(dataset, splits=(0.7, 0.1, 0.2), seed: int = 42):
+  """
+  Split a time-series dataset into contiguous train/validation/test segments.
+  Returns torch.utils.data.dataset.Subset objects.
 
-    Parameters:
-        df (pd.DataFrame | pl.DataFrame | pl.LazyFrame): Input dataset, ordered in descending dates.
-        train_ratio (float): Proportion for training.
-        val_ratio (float): Proportion for validation.
-        test_ratio (float): Proportion for testing.
+  Parameters:
+    dataset : torch.utils.data.Dataset or compatible
+    splits  : tuple or list of three floats (train_ratio, val_ratio, test_ratio)
+    seed    : int (unused)
 
-    Returns:
-        tuple: (train, validation, test) of the same type as `df`.
-    """
-    try:
-        logging.info("Starting time series split: train=%.2f, val=%.2f, test=%.2f",
-                    train_ratio, val_ratio, test_ratio)
+  Returns:
+    (train, val, test) as torch.utils.data.dataset.Subset objects
+  """
+  try:
+    if abs(sum(splits) - 1.0) > 1e-6:
+      raise ValueError(f"Train/val/test splits must sum to 1.0. Got {splits}")
 
-        total_ratio = train_ratio + val_ratio + test_ratio
-        if abs(total_ratio - 1.0) > 1e-9:
-            raise ValueError(f"Ratios must sum to 1.0 (got {total_ratio:.4f})")
+    n = len(dataset)
+    test_len = int(n * splits[2])
+    val_len = int(n * splits[1])
+    train_len = n - test_len - val_len
 
-        # --- Handle pandas ---
-        if isinstance(df, pd.DataFrame):
-            n = len(df)
-            if n == 0:
-                raise ValueError("Input pandas DataFrame is empty")
-            train_end = int(n * train_ratio)
-            val_end = train_end + int(n * val_ratio)
+    logging.info("Splitting time series (n=%d): train=%d, val=%d, test=%d", n, train_len, val_len, test_len)
 
-            train_data = df.iloc[:train_end].sort_index(ascending=True)
-            val_data = df.iloc[train_end:val_end].sort_index(ascending=True)
-            test_data = df.iloc[val_end:].sort_index(ascending=True)
-
-            logging.info("Split pandas DataFrame: train=%d, val=%d, test=%d",
-                        len(train_data), len(val_data), len(test_data))
-            logging.debug("Train indices: 0-%d, Val indices: %d-%d, Test indices: %d-%d",
-                         train_end-1, train_end, val_end-1, val_end, n-1)
-            return train_data, val_data, test_data
-
-        # --- Handle polars DataFrame ---
-        elif isinstance(df, pl.DataFrame):
-            n = df.height
-            if n == 0:
-                raise ValueError("Input Polars DataFrame is empty")
-            train_end = int(n * train_ratio)
-            val_end = train_end + int(n * val_ratio)
-
-            train_data = df.slice(0, train_end)
-            val_data = df.slice(train_end, val_end - train_end)
-            test_data = df.slice(val_end, n - val_end)
-
-            logging.info("Split Polars DataFrame: train=%d, val=%d, test=%d",
-                        train_data.height, val_data.height, test_data.height)
-            return train_data, val_data, test_data
-
-        # --- Handle polars LazyFrame ---
-        elif isinstance(df, pl.LazyFrame):
-            n = df.collect().height
-            if n == 0:
-                raise ValueError("Input Polars LazyFrame is empty")
-            train_end = int(n * train_ratio)
-            val_end = train_end + int(n * val_ratio)
-
-            train_data = df.slice(0, train_end)
-            val_data = df.slice(train_end, val_end - train_end)
-            test_data = df.slice(val_end, n - val_end)
-
-            logging.info("Prepared lazy splits for Polars LazyFrame (rows=%d)", n)
-            logging.debug("LazyFrame split indices: train=0-%d, val=%d-%d, test=%d-%d",
-                         train_end-1, train_end, val_end-1, val_end, n-1)
-            return train_data, val_data, test_data
-
-        else:
-            raise TypeError("Input must be a pandas.DataFrame, polars.DataFrame, or polars.LazyFrame")
-
-    except Exception as e:
-        logging.exception("Failed to split time series data: %s", e)
-        raise
+    
+    test = Subset(dataset, range(test_len))
+    val = Subset(dataset, range(test_len, test_len + val_len))
+    train = Subset(dataset, range(test_len + val_len, n))
+    
+    logging.info("Subset split sizes: train=%d, val=%d, test=%d", train_len, val_len, test_len)
+    return (train, val, test)
+      
+  except Exception as e:
+    logging.exception("Failed to split time series data: %s", e)
+    raise
 
 # -------------------------------------------------------------------------
 # Process image datasets
@@ -290,7 +245,10 @@ def load_data(args):
             elif args.tabulardata:
                 csv_dataset, d_input, d_output, df, x_columns = \
                     process_tabular_data(args.dataset, args.dependent_variable, args.independent_variables, args.modeltype)
-                trainset, valset, testset = split_dataset(csv_dataset, splits=args.trainvaltestsplit)
+                if args.timeseriessplit:
+                    trainset, valset, testset = split_time_series_data(csv_dataset, splits=args.trainvaltestsplit)
+                else:
+                    trainset, valset, testset = split_dataset(csv_dataset, splits=args.trainvaltestsplit)
                 train_df, test_df = None, None
             else:
                 raise NotImplementedError("Dataset type not recognized.")
@@ -306,7 +264,10 @@ def load_data(args):
 
             if not args.valset:
                 warnings.warn("Validation dataset not provided. Splitting training dataset 80/20.")
-                trainset, valset, _ = split_dataset(trainset, splits=[0.8, 0.2, 0.0])
+                if args.timeseriessplit:
+                    trainset, valset,_ = split_time_series_data(trainset, splits=[0.8, 0.2, 0.0])
+                else:
+                    trainset, valset, _ = split_dataset(trainset, splits=[0.8, 0.2, 0.0])
             else:
                 valset, _, _, val_df, _ = \
                     process_tabular_data(args.valset, args.dependent_variable, args.independent_variables, args.modeltype)

@@ -16,8 +16,9 @@ def get_args():
     parser.add_argument('--modeltype', type=str, required=True, choices=["regression", "classification"],
                         help='Model type ["regression", "classification"]')
     parser.add_argument('--dataset', type=str, help='Dataset ["mnist", "cifar10", "customfullpath"]')
+    parser.add_argument('--timeseriessplit', action='store_true', default=False, help="Use time series split")
     parser.add_argument('--trainvaltestsplit', type=float, nargs=3, default=[0.7, 0.1, 0.2],
-                        help="Train, val, test split (should sum to 1.0)")
+                        help="[Train, val, test] split (should sum to 1.0)")
     parser.add_argument('--trainset', type=str, help="Training dataset path")
     parser.add_argument('--valset', type=str, help="Validation dataset path")
     parser.add_argument('--testset', type=str, help="Test dataset path")
@@ -47,7 +48,9 @@ def get_args():
 
     # Output data
     parser.add_argument('--output_data', action='store_true', default=False, 
-                        help="Output data with the predictions (default: False) — set this flag to enable outputting input datasets along with predictions as part of the final dataset.")
+                        help="Output data with the predictions (default: False) — set this flag to enable outputting input datasets along with predictions as part of the final dataset.")    
+    parser.add_argument('--csv', action='store_true', default=False, 
+                        help="Output data in CSV format (default: True) — set this flag to enable outputs in CSV format. If not set, outputs will be in Parquet format.")
 
     if '--help' in sys.argv:
         parser.print_help()
