@@ -176,3 +176,9 @@ data/
 results/
 s4model/logs/
 checkpoint/
+weathermetricsdata/.venv
+weathermetricsdata/uv.lock
+weathermetricsdata/.pytest_cache/
+weathermetricsdata/src/weathermetricsdata.egg-info
+weathermetricsdata/src/weathermetricsdata/data/
+weathermetricsdata/src/weathermetricsdata/output/

@@ -3,14 +3,15 @@
 import argparse
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create Model Metric Charts")
-    parser.add_argument("--df", required=True, type=str, help = "Full path of the csv file with actual and predicted values")    
+    parser.add_argument("--df", required=True, type=str, help = "Full path of the input file (csv or parquet) with actual and predicted values")    
     parser.add_argument("--actual", required=True, type=str, help = "Column name of actual values")
     parser.add_argument("--predicted", required=True, type=str, help = "Column name of predicted values")
     # parser.add_argument("--labels", type=str, help =  "Comma separated list of labels")
     # parser.add_argument("--title", type=str,help= "Title of the chart")
     # parser.add_argument("--xlabel", type=str, help= "X-axis label")
     # parser.add_argument("--ylabel", type=str, help= "Y-axis label")
-    parser.add_argument("--chart_type", type=str, nargs='+', default=["c", "sb", 'am'], help="Type(s) of chart(s) to create. Options: s (scatter), m (mismatches), c (confusion_matrix), e (error_distribution), mh (misclassification_heatmap), sb (stacked_bar), am (accuracy_metrics).")
+    parser.add_argument("--chart_type", type=str, nargs='+', default=['am'], help="Type(s) of chart(s) to create. Options: s (scatter), m (mismatches), c (confusion_matrix), e (error_distribution), mh (misclassification_heatmap), sb (stacked_bar), am (accuracy_metrics).")
+    parser.add_argument("--csv", action="store_true", help="Whether input dataset is a CSV file.")
     args, unknown = parser.parse_known_args()
 
 #%%
@@ -22,6 +23,7 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import torch
+import polars as pl
 
 #%%
 def plot_target_vs_predicted(target_values, predicted_values, title="Actual vs Predicted", xlabel="Actual", ylabel="Predicted"):
@@ -279,6 +281,14 @@ def plot_stacked_bar(target_values, predicted_values, labels, title='Proportion 
 
 # %%
 
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
+import seaborn as sns
+import pandas as pd
+import numpy as np
+import torch
+import polars as pl
+
 def calculate_class_wise_metrics(actual_values, predicted_values, labels):
     """
     Calculates class-wise precision, recall, F1-score, support, accuracy, TPR, and FPR for a multi-class classification problem.
@@ -299,6 +309,7 @@ def calculate_class_wise_metrics(actual_values, predicted_values, labels):
 
     # Calculate confusion matrix
     cm = confusion_matrix(actual_values, predicted_values, labels=labels)
+    cm_df = pd.DataFrame(cm, index=sorted(labels), columns=sorted(labels))
 
     # Calculate overall accuracy
     accuracy = np.trace(cm) / np.sum(cm)
@@ -338,14 +349,22 @@ def calculate_class_wise_metrics(actual_values, predicted_values, labels):
     metrics_df = metrics_df.sort_values(by='Class').reset_index(drop=True).merge(overall_metrics, on='Class')
     metrics_df = metrics_df[['Class', 'Precision', 'Recall', 'Specificity', 'TPR', 'FPR', 'F1-Score', 'Support']].round(4)
 
-    return accuracy, metrics_df
+    return cm_df, accuracy, metrics_df
+
 
 # %%
 if __name__ == "__main__":
-    df = pd.read_csv(args.df)
+    # Detect file format - use --csv flag if provided, otherwise infer from extension
+    if args.csv or args.df.endswith('.csv'):
+        df = pd.read_csv(args.df)
+    elif args.df.endswith('.parquet') or args.df.endswith('.pq'):
+        df = pd.read_parquet(args.df)
+    else:
+        raise ValueError(f"Unsupported file format: {args.df}. Please use .csv or .parquet files.")
+    
     actual_values = df[args.actual]
     predicted_values = df[args.predicted]
-    labels = df[args.actual].unique()
+    labels = sorted(actual_values.unique())
 
     for chart_type in args.chart_type:
         if chart_type in ["s", "scatter"]:
@@ -361,8 +380,10 @@ if __name__ == "__main__":
         elif chart_type in ["sb", "stacked_bar"]:
             plot_stacked_bar(actual_values, predicted_values, labels=labels)
         elif chart_type in ["am", "accuracy_metrics"]:
-            accuracy,metrics_df = calculate_class_wise_metrics(actual_values, predicted_values, labels)
-            print("Accuracy = ", round(accuracy, 4))            
+            confusionmatrix, accuracy, metrics_df = calculate_class_wise_metrics(actual_values, predicted_values, labels)
+            print("Accuracy = ", round(accuracy, 4))
+            print("\nConfusion Matrix:")
+            print(confusionmatrix)            
             print("Class-wise Metrics (Sorted by Class):")            
             print(metrics_df)
             # Formulas for reference

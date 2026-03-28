@@ -1,0 +1,39 @@
+{
+    "stations_csv": "src/weathermetricsdata/data/stations.csv",
+    "station_id_col": "stid",
+    "latitude_col": "latitude",
+    "longitude_col": "longitude",
+    "weather_dir": "src/weathermetricsdata/data",
+    "n_miles": 0,
+    "direction": null,
+    "max_stations": 10,
+    "extra_station_ids": ["72528014733", "72502014734"],
+    "indep_vars": ["air_temp_degrees_cels_mean"],
+    "time_args": {
+        "date_col": "Date_YYYYMMDD",
+        "time_col": "nHOUR",
+        "datetime_col": "datetime" },
+    "agg_map": {
+        "precip_depth_sum_mm": ["sum"],
+        "air_temp_degrees_cels": ["mean"]},    
+    "period_freq": "1d",
+    "lookback_days": 2,
+    "years_back": 2,
+    "bins": [-9999,1,5,20,99999],
+    "labels": [0,1,2,3],
+    "calculate_aux_features": false,
+    "aux_resample_apply_to_primary": true,
+    "aux_agg_map": {
+        "precip_depth_sum_mm_sum": ["sum"],
+        "air_temp_degrees_cels_mean": ["mean"]},
+    "aux_rolling_windows": [7],
+    "aux_output_mode": "both",
+    "drop_date_stationid": true,
+    "output_dir": "src/weathermetricsdata/output",
+    "output_formats": ["csv", "parquet"],
+    "output_prefix": "pipeline",   
+    "chunk_size": 200000,
+    "engine": "polars",
+    "n_workers": 4    
+}
+

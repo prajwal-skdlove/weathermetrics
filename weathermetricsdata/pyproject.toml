@@ -1,0 +1,21 @@
+[project.scripts]
+run_pipeline = "weathermetricsdata.run_pipeline:main"
+
+[project]
+name = "weathermetricsdata"
+version = "0.1.0"
+requires-python=">=3.10"
+dependencies = [
+    "pandas",
+    "polars",
+    "numba",
+    "pyarrow",
+    "pytest"
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
