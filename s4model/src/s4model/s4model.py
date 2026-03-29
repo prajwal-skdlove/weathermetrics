@@ -21,7 +21,7 @@ def main():
     # Set up logging
     setup_logging()
 
-    from config import get_args
+    from .config import get_args
     # Parse argumentstorch
     args, unknown = get_args()
     logging.info(f"Training Inputs: {args}")
@@ -31,10 +31,10 @@ def main():
     import torch.backends.cudnn as cudnn
     import torch.nn as nn
     from tqdm import tqdm    
-    from dataset import load_data, verify_loaders
-    from output import combine_results_to_dataframe
-    from model import S4Model, setup_optimizer
-    from train import train, eval, load_model
+    from .dataset import load_data, verify_loaders
+    from .output import combine_results_to_dataframe
+    from .model import S4Model, setup_optimizer
+    from .train import train, eval, load_model
 
 
     # Set device

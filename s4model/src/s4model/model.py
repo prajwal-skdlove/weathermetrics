@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from models.s4.s4d import S4D
-from models.s4.s4 import S4Block as S4  # optional full version
+from .models.s4.s4d import S4D
+# from .models.s4.s4 import S4Block as S4  # optional full version
 import logging
 
 

@@ -1,0 +1,10 @@
+[tool.uv.workspace]
+members = [
+    "s4model",
+    "weathermetricsdata"
+] 
+
+[tool.uv]
+dev-dependencies = [
+    "pytest"
+]

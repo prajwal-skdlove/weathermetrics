@@ -280,15 +280,6 @@ def plot_stacked_bar(target_values, predicted_values, labels, title='Proportion 
     plt.show()
 
 # %%
-
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
-import seaborn as sns
-import pandas as pd
-import numpy as np
-import torch
-import polars as pl
-
 def calculate_class_wise_metrics(actual_values, predicted_values, labels):
     """
     Calculates class-wise precision, recall, F1-score, support, accuracy, TPR, and FPR for a multi-class classification problem.

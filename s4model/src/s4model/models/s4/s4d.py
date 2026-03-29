@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange, repeat
 
-from src.models.nn import DropoutNd
+from ..nn import DropoutNd
 
 class S4DKernel(nn.Module):
     """Generate convolution kernel from diagonal SSM parameters."""

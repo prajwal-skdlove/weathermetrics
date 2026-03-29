@@ -1,0 +1,40 @@
+[project]
+name = "s4model"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas",
+    "polars",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "seaborn",
+    "tqdm",
+    "torch",
+    "scikit-learn",
+    "torchvision",
+    "pyarrow",
+    "lightning",
+    "einops",
+    # "pykeops",
+    "torchtext",
+    "lit",
+    "rich",
+    "hydra-core",
+    "omegaconf",
+    "wandb",
+   #  "cmake",
+    "transformers"
+    # add s4model specific deps
+] 
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[project.scripts]
+s4model = "s4model.s4model:main"
+s4modelinfer = "s4model.infer:main"

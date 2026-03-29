@@ -4,7 +4,7 @@ from tqdm import tqdm
 import os
 import logging
 import numpy as np
-from model import log_gradients
+from .model import log_gradients
 
 
 ###############################################################################
@@ -218,8 +218,9 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
     # ---- Checkpoint saving ----
     try:
         if checkpoint:
-            if not os.path.isdir('../checkpoint'):
-                os.mkdir('../checkpoint')
+            checkpoint_dir = "../checkpoint"
+            if not os.path.isdir(f'{checkpoint_dir}'):
+                os.mkdir(f'{checkpoint_dir}')
 
             if modeltype == "classification":
                 acc = 100. * correct / total if total > 0 else 0.0
@@ -230,7 +231,7 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
                         "epoch": epoch,
                         "args": vars(args) if not isinstance(args, dict) else args
                     }
-                    torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
+                    torch.save(state, f'{checkpoint_dir}/{modelname}ckpt.pth')
                     logging.info(f"Checkpoint saved: {modelname}ckpt.pth (Acc: {acc:.2f}%)")
                     best_acc = acc
                 return acc, output_list_target, output_list_predicted, prob_list, input_list
@@ -243,7 +244,7 @@ def eval(model, dataloader, criterion, device, epoch, modelname, best_acc,
                     "epoch": epoch,
                     "args": vars(args) if not isinstance(args, dict) else args
                 }
-                torch.save(state, f'../checkpoint/{modelname}ckpt.pth')
+                torch.save(state, f'{checkpoint_dir}/{modelname}ckpt.pth')
                 logging.info(f"Checkpoint saved: {modelname}ckpt.pth (MSE: {mse:.4f})")
                 return mse, output_list_target, output_list_predicted, prob_list, input_list
 

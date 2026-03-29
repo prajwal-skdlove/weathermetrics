@@ -681,7 +681,14 @@ def create_dep_var(
     # Generate primary lagged DataFrame (existing logic)
     station_frames = {}
     for station, g in df.groupby(station_col):
-        g2 = (g.set_index(date_col).asfreq(freq).infer_objects(copy=False).interpolate(method='time').ffill().bfill())
+        numeric_data = g.set_index(date_col).asfreq(freq).infer_objects().select_dtypes(exclude=['object', 'str'])
+        string_data = g.set_index(date_col).asfreq(freq).select_dtypes(include=['object', 'str'])
+
+        g2 = (pd.concat([
+            numeric_data.interpolate(method='time').ffill().bfill(),
+            string_data.ffill().bfill()
+        ], axis=1))
+        # g2 = (g.set_index(date_col).asfreq(freq).infer_objects(copy=False).interpolate(method='time').ffill().bfill())
         
         lag_cols = []
         # Lags for target_var

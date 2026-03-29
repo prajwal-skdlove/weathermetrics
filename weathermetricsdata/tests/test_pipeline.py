@@ -97,7 +97,7 @@ def test_resample_summary_logic():
         'temp': [10, 20, 30, 40]
     })
     # Daily mean
-    res = resample_summary(df, period='1d', agg_map={'temp': ['mean']})
+    res = resample_summary(df, period='1D', agg_map={'temp': ['mean']})
     # 2020-01-01 should have mean(10,20) = 15
     row1 = res[res['datetime'] == '2020-01-01']
     assert row1['temp_mean'][0] == 15
@@ -111,7 +111,7 @@ def test_pipeline_run_minimal():
         stations.to_csv(os.path.join(tmp, 'stations.csv'), index=False)
         weather = pd.DataFrame({
             'date': ['2020-01-01','2020-01-02','2020-01-03', '2020-01-04', '2020-01-05', '2020-01-06'],
-            'hour':[1,1,1,1,1,1],
+            'hour':['01','01','01','01','01','01'],            
             'stid': ['72206013889']*6,
             'air_temp':[10,11,12,13,14,15],
         })

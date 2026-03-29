@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
 
-from src.models.nn.activation import Activation
+from .activation import Activation
 
 contract = torch.einsum
 
