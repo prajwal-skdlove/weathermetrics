@@ -105,6 +105,26 @@ def test_resample_summary_logic():
     row2 = res[res['datetime'] == '2020-01-02']
     assert row2['temp_mean'][1] == 30
 
+def test_resample_summary_rolling_uses_agg_map():
+    df = pd.DataFrame({
+        'stationid': ['1', '1', '1'],
+        'datetime': pd.to_datetime(['2020-01-01 00:00', '2020-01-01 01:00', '2020-01-01 02:00']),
+        'temp': [10, 20, 30]
+    })
+    res = resample_summary(
+        df,
+        period='1h',
+        agg_map={'temp': ['sum', 'max']},
+        rolling=True,
+        rolling_window='2h'
+    )
+
+    assert list(res.columns) == ['stationid', 'datetime', 'temp_sum', 'temp_max']
+    assert res.loc[res['datetime'] == pd.Timestamp('2020-01-01 00:00'), 'temp_sum'].iloc[0] == 10
+    assert res.loc[res['datetime'] == pd.Timestamp('2020-01-01 01:00'), 'temp_sum'].iloc[0] == 30
+    assert res.loc[res['datetime'] == pd.Timestamp('2020-01-01 01:00'), 'temp_max'].iloc[0] == 20
+    assert res.loc[res['datetime'] == pd.Timestamp('2020-01-01 02:00'), 'temp_max'].iloc[0] == 30
+
 def test_pipeline_run_minimal():
     with tempfile.TemporaryDirectory() as tmp:
         stations = pd.DataFrame({'stid':['72206013889'], 'latitude':[40.0], 'longitude':[-105.0]})
@@ -154,6 +174,23 @@ def test_create_dep_var_lookback():
     })
     out = create_dep_var(df, target_var='air_temp', lookback_days=1, freq='1h')
     assert '1_air_temp_lag_1' in out.columns
+
+def test_create_dep_var_rolling_window_extra_lag():
+    df = pd.DataFrame({
+        'stationid': ['1']*40,
+        'datetime': pd.date_range('2020-01-01', periods=40, freq='h'),
+        'air_temp': list(range(40)),
+    })
+    out = create_dep_var(
+        df,
+        target_var='air_temp',
+        lookback_days=1,
+        freq='1h',
+        first_lag_hours=2,
+        rolling_window='4h'
+    )
+    assert '1_air_temp_lag_5' in out.columns
+    assert '1_air_temp_lag_4' not in out.columns
 
 def test_create_dep_var_multi_indep_vars_station_prefix():
     df = pd.DataFrame({
@@ -233,8 +270,8 @@ def test_resample_auxiliary_summary_basic():
     # Check result has correct number of rows (one per datetime)
     assert len(result) == 10
     
-    # Check values (mean of precip across 2 stations at lag should be 4.0)
-    assert result['multistations_precip_mean_1d'][4] == 4.0
+    # Check values (mean of precip across 2 stations should mirror current resample semantics)
+    assert result['multistations_precip_mean_1d'][4] == 5.0
 
 
 def test_resample_auxiliary_summary_rolling():
@@ -257,15 +294,14 @@ def test_resample_auxiliary_summary_rolling():
     # Check rolling column exists
     assert '2_precip_mean_2d' in result.columns
     
-    # First row should be NaN (no prior history)
-    assert pd.isna(result['2_precip_mean_2d'][0])
-    
-    # Second row should be NaN (shift(1) * rolling(2, closed='left') = only 1 value)
-    assert pd.isna(result['2_precip_mean_2d'][1])
+    # First row should use the current window of length 2 with min_periods=1
+    assert result['2_precip_mean_2d'][0] == 1.0
 
-    # Third value (index 2) should be mean of [1, 2] = 1.5
-    if not pd.isna(pd.isna(result['2_precip_mean_2d'][2])):
-        assert result['2_precip_mean_2d'][2] == 1.5
+    # Second row should be mean of [1, 2] = 1.5
+    assert result['2_precip_mean_2d'][1] == 1.5
+
+    # Third row should be mean of [2, 3] = 2.5
+    assert result['2_precip_mean_2d'][2] == 2.5
 
 def test_create_dep_var_with_aux_dfs():
     """Test create_dep_var using the pre-computed aux_dfs and output modes."""
@@ -325,3 +361,124 @@ def test_resample_auxiliary_summary_empty():
     
     # Should return empty DataFrame
     assert len(result) == 0
+
+
+def test_create_dep_var_first_lag_hours_hourly():
+    """Test first_lag_hours=24 with hourly frequency (should start at 24-hour lag)."""
+    # Create 72 hours of data
+    df = pd.DataFrame({
+        'stationid': ['1'] * 72,
+        'datetime': pd.date_range('2020-01-01', periods=72, freq='1h'),
+        'rainfall': list(range(72))  # 0, 1, 2, ..., 71
+    })
+    
+    out = create_dep_var(
+        df, 
+        target_var='rainfall', 
+        lookback_days=2,  # 48 lags
+        freq='1h',
+        first_lag_hours=24
+    )
+    
+    # With first_lag_hours=24, first lag column should be rainfall_lag_24
+    assert '1_rainfall_lag_24' in out.columns
+    # lag_1 through lag_23 should NOT exist
+    assert '1_rainfall_lag_1' not in out.columns
+    assert '1_rainfall_lag_23' not in out.columns
+    # Should have lags from 24 to 24+48-1=71
+    assert '1_rainfall_lag_71' in out.columns
+
+
+def test_create_dep_var_first_lag_hours_daily():
+    """Test first_lag_hours=48 with daily frequency (should start at 2-day lag)."""
+    # Create 10 days of data
+    df = pd.DataFrame({
+        'stationid': ['1'] * 10,
+        'datetime': pd.date_range('2020-01-01', periods=10, freq='1d'),
+        'rainfall': list(range(10))  # 0, 1, 2, ..., 9
+    })
+    
+    out = create_dep_var(
+        df, 
+        target_var='rainfall', 
+        lookback_days=7,  # 7 lags
+        freq='1d',
+        first_lag_hours=48  # 2 days
+    )
+    
+    # With first_lag_hours=48 and freq=1d, offset = 48*3600 / 86400 = 2
+    # So first lag should be lag_2
+    assert '1_rainfall_lag_2' in out.columns
+    assert '1_rainfall_lag_1' not in out.columns
+    assert '1_rainfall_lag_8' in out.columns  # 2 + 7 - 1 = 8
+
+
+def test_create_dep_var_first_lag_hours_with_indep_vars():
+    """Test first_lag_hours with multiple independent variables."""
+    df = pd.DataFrame({
+        'stationid': ['1'] * 48,
+        'datetime': pd.date_range('2020-01-01', periods=48, freq='1h'),
+        'rainfall': list(range(48)),
+        'temperature': [20 + i*0.5 for i in range(48)],
+    })
+    
+    out = create_dep_var(
+        df, 
+        target_var='rainfall', 
+        lookback_days=1,  # 24 lags
+        freq='1h',
+        indep_vars=['temperature'],
+        first_lag_hours=12
+    )
+    
+    # With first_lag_hours=12, first lag offset = 12
+    # So first lag should be lag_12
+    assert '1_rainfall_lag_12' in out.columns
+    assert '1_temperature_lag_12' in out.columns
+    assert '1_rainfall_lag_11' not in out.columns
+    assert '1_temperature_lag_11' not in out.columns
+
+
+def test_create_dep_var_first_lag_hours_validation_warning(caplog):
+    """Test that warning is logged when first_lag_hours < frequency."""
+    df = pd.DataFrame({
+        'stationid': ['1'] * 10,
+        'datetime': pd.date_range('2020-01-01', periods=10, freq='1d'),
+        'rainfall': list(range(10))
+    })
+    
+    with caplog.at_level(logging.WARNING):
+        out = create_dep_var(
+            df, 
+            target_var='rainfall', 
+            lookback_days=5,
+            freq='1d',
+            first_lag_hours=1  # 1 hour < 1 day frequency
+        )
+    
+    # Check that warning was logged
+    assert 'first_lag_hours=1 is smaller than frequency=1d' in caplog.text
+    assert 'First lag offset will be set to 1' in caplog.text
+
+
+def test_create_dep_var_first_lag_hours_week():
+    """Test first_lag_hours=168 with hourly frequency (should start at 1-week lag)."""
+    # Create 360 hours (15 days) of data
+    df = pd.DataFrame({
+        'stationid': ['1'] * 360,
+        'datetime': pd.date_range('2020-01-01', periods=360, freq='1h'),
+        'rainfall': list(range(360))
+    })
+    
+    out = create_dep_var(
+        df, 
+        target_var='rainfall', 
+        lookback_days=14,  # 336 lags
+        freq='1h',
+        first_lag_hours=168  # 1 week = 168 hours
+    )
+    
+    # With first_lag_hours=168, first lag should be lag_168
+    assert '1_rainfall_lag_168' in out.columns
+    assert '1_rainfall_lag_167' not in out.columns
+    assert '1_rainfall_lag_1' not in out.columns

@@ -38,3 +38,4 @@ package-dir = {"" = "src"}
 [project.scripts]
 s4model = "s4model.s4model:main"
 s4modelinfer = "s4model.infer:main"
+charts = "s4model.charts:main"

@@ -1,18 +1,16 @@
 # %%
 
 import argparse
-if __name__ == "__main__":
+
+
+def build_arg_parser():
     parser = argparse.ArgumentParser(description="Create Model Metric Charts")
-    parser.add_argument("--df", required=True, type=str, help = "Full path of the input file (csv or parquet) with actual and predicted values")    
-    parser.add_argument("--actual", required=True, type=str, help = "Column name of actual values")
-    parser.add_argument("--predicted", required=True, type=str, help = "Column name of predicted values")
-    # parser.add_argument("--labels", type=str, help =  "Comma separated list of labels")
-    # parser.add_argument("--title", type=str,help= "Title of the chart")
-    # parser.add_argument("--xlabel", type=str, help= "X-axis label")
-    # parser.add_argument("--ylabel", type=str, help= "Y-axis label")
+    parser.add_argument("--df", required=True, type=str, help="Full path of the input file (csv or parquet) with actual and predicted values")
+    parser.add_argument("--actual", required=True, type=str, help="Column name of actual values")
+    parser.add_argument("--predicted", required=True, type=str, help="Column name of predicted values")
     parser.add_argument("--chart_type", type=str, nargs='+', default=['am'], help="Type(s) of chart(s) to create. Options: s (scatter), m (mismatches), c (confusion_matrix), e (error_distribution), mh (misclassification_heatmap), sb (stacked_bar), am (accuracy_metrics).")
     parser.add_argument("--csv", action="store_true", help="Whether input dataset is a CSV file.")
-    args, unknown = parser.parse_known_args()
+    return parser
 
 #%%
 # import matplotlib
@@ -345,14 +343,20 @@ def calculate_class_wise_metrics(actual_values, predicted_values, labels):
 
 # %%
 if __name__ == "__main__":
-    # Detect file format - use --csv flag if provided, otherwise infer from extension
+    main()
+
+
+def main(argv=None):
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+
     if args.csv or args.df.endswith('.csv'):
         df = pd.read_csv(args.df)
     elif args.df.endswith('.parquet') or args.df.endswith('.pq'):
         df = pd.read_parquet(args.df)
     else:
         raise ValueError(f"Unsupported file format: {args.df}. Please use .csv or .parquet files.")
-    
+
     actual_values = df[args.actual]
     predicted_values = df[args.predicted]
     labels = sorted(actual_values.unique())
@@ -366,7 +370,7 @@ if __name__ == "__main__":
             plot_confusion_matrix(actual_values, predicted_values, labels)
         elif chart_type in ["e", "error_distribution"]:
             plot_error_distribution(actual_values, predicted_values)
-        elif chart_type in ["mh", "misclassification_heatmap"]:  
+        elif chart_type in ["mh", "misclassification_heatmap"]:
             plot_misclassification_heatmap(actual_values, predicted_values, labels)
         elif chart_type in ["sb", "stacked_bar"]:
             plot_stacked_bar(actual_values, predicted_values, labels=labels)
@@ -379,7 +383,7 @@ if __name__ == "__main__":
             print(metrics_df)
             # Formulas for reference
             print("\nFormulas:")
-            print("Accuracy = (True Positives + True Negatives) / Total Samples")            
+            print("Accuracy = (True Positives + True Negatives) / Total Samples") 
             print("Precision = True Positives / (True Positives + False Positives)")
             print("Recall = True Positives / (True Positives + False Negatives)")
             print("F1-Score = 2 * (Precision * Recall) / (Precision + Recall)")
@@ -389,6 +393,10 @@ if __name__ == "__main__":
             print("Support = Number of actual instances for each class")
         else:
             print(f"Invalid chart type: {chart_type}. Please choose from: s (scatter), m (mismatches), c (confusion_matrix), e (error_distribution), mh (misclassification_heatmap), sb (stacked_bar).")
+
+
+if __name__ == "__main__":
+    main()
 
 # %%
 # df = pd.read_csv("../results/74486094789_Test_results_20250414_103853PM.csv")

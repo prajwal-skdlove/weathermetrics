@@ -27,7 +27,7 @@ def main():
     start_time = time.perf_counter()
     logger.info("Pipeline execution started.")
     parser = argparse.ArgumentParser(description='Weather data cleaning pipeline runner')
-    parser.add_argument('--config', type=str, default='pipeline_config.json', help='Path to config JSON')
+    parser.add_argument('--config', type=str, default='./weathermetricsdata/pipeline_config.json', help='Path to config JSON')
     parser.add_argument('--station-id', type=str, default=None, help='Optional station id to query')
     parser.add_argument('--lat', type=float, default=None, help='Optional lat coordinate for query')
     parser.add_argument('--lon', type=float, default=None, help='Optional lon coordinate for query')
